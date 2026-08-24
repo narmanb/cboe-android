@@ -25,7 +25,6 @@ set(SFML_BUILD_NETWORK ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     SFML
     URL https://github.com/SFML/SFML/archive/refs/tags/2.6.2.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(SFML)
 
@@ -36,7 +35,6 @@ set(BOOST_INCLUDE_LIBRARIES filesystem system CACHE STRING "" FORCE)
 FetchContent_Declare(
     Boost
     URL https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.xz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(Boost)
 
