@@ -28,10 +28,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SFML)
 
-# Classic BoE still uses Boost.Filesystem and several header-only Boost
-# components. Build only filesystem/system for Android and expose the rest of
-# the headers from the same Boost tree.
-set(BOOST_INCLUDE_LIBRARIES filesystem system CACHE STRING "" FORCE)
+# Classic BoE uses Boost.Filesystem plus header-only Boost modules. Boost's
+# modular CMake build only exposes headers for modules that are explicitly
+# selected, so include every module currently used directly by the game.
+set(BOOST_INCLUDE_LIBRARIES filesystem system algorithm dynamic_bitset CACHE STRING "" FORCE)
 FetchContent_Declare(
     Boost
     URL https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.xz
@@ -186,6 +186,8 @@ target_link_libraries(cboe PRIVATE
     tgui
     Boost::filesystem
     Boost::system
+    Boost::algorithm
+    Boost::dynamic_bitset
     sfml-graphics
     sfml-window
     sfml-audio
