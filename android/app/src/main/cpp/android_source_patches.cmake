@@ -22,8 +22,36 @@ if(CBOE_STARTANIM_COPY_POS EQUAL -1)
     message(FATAL_ERROR "Expected OpenBoE draw_startup_anim texture copy was not found")
 endif()
 string(REPLACE "${CBOE_STARTANIM_COPY_OLD}" "${CBOE_STARTANIM_COPY_NEW}" CBOE_GRAPHICS_SOURCE "${CBOE_GRAPHICS_SOURCE}")
+
+# Emit the exact physical pixel center of the Tutorial button once. The CI
+# emulator uses this to perform a real Android touchscreen tap instead of only
+# checking that the process stayed alive.
+set(CBOE_GRAPHICS_INCLUDE_OLD "#include <fmt/format.h>")
+set(CBOE_GRAPHICS_INCLUDE_NEW "#include <fmt/format.h>\n#include <android/log.h>")
+string(FIND "${CBOE_GRAPHICS_SOURCE}" "${CBOE_GRAPHICS_INCLUDE_OLD}" CBOE_GRAPHICS_INCLUDE_POS)
+if(CBOE_GRAPHICS_INCLUDE_POS EQUAL -1)
+    message(FATAL_ERROR "Expected OpenBoE graphics include block was not found")
+endif()
+string(REPLACE "${CBOE_GRAPHICS_INCLUDE_OLD}" "${CBOE_GRAPHICS_INCLUDE_NEW}" CBOE_GRAPHICS_SOURCE "${CBOE_GRAPHICS_SOURCE}")
+set(CBOE_DRAW_STARTUP_OLD [=[void draw_startup(short but_type) {
+	sf::Texture& startup_gworld = *ResMgr::graphics.get("startup", true);]=])
+set(CBOE_DRAW_STARTUP_NEW [=[void draw_startup(short but_type) {
+	static bool android_startup_center_logged = false;
+	if(!android_startup_center_logged) {
+		const rectangle& r = startup_button[STARTBTN_TUTORIAL];
+		sf::Vector2f center((r.left + r.right) / 2.0f, (r.top + r.bottom) / 2.0f);
+		sf::Vector2i pixel = mainPtr().mapCoordsToPixel(center, mainView);
+		__android_log_print(ANDROID_LOG_INFO, "OpenBoEAndroid", "TUTORIAL_CENTER %d %d", pixel.x, pixel.y);
+		android_startup_center_logged = true;
+	}
+	sf::Texture& startup_gworld = *ResMgr::graphics.get("startup", true);]=])
+string(FIND "${CBOE_GRAPHICS_SOURCE}" "${CBOE_DRAW_STARTUP_OLD}" CBOE_DRAW_STARTUP_POS)
+if(CBOE_DRAW_STARTUP_POS EQUAL -1)
+    message(FATAL_ERROR "Expected OpenBoE draw_startup function was not found")
+endif()
+string(REPLACE "${CBOE_DRAW_STARTUP_OLD}" "${CBOE_DRAW_STARTUP_NEW}" CBOE_GRAPHICS_SOURCE "${CBOE_GRAPHICS_SOURCE}")
 file(WRITE "${CBOE_GRAPHICS_CPP}" "${CBOE_GRAPHICS_SOURCE}")
-message(STATUS "Applied Android draw_startup_anim texture-reference patch")
+message(STATUS "Applied Android draw_startup texture and touch-test instrumentation patches")
 
 # On desktop the game shows Welcome / Tip-of-the-Day in a separate modal
 # RenderWindow before the real main event loop starts. SFML's Android backend
@@ -56,6 +84,30 @@ endif()
 string(REPLACE "${CBOE_STARTUP_DIALOGS_OLD}" "${CBOE_STARTUP_DIALOGS_NEW}" CBOE_MAIN_SOURCE "${CBOE_MAIN_SOURCE}")
 file(WRITE "${CBOE_MAIN_CPP}" "${CBOE_MAIN_SOURCE}")
 message(STATUS "Skipped desktop startup modal dialogs on Android")
+
+# Log actual startup-button dispatch so CI can prove that a real Android tap
+# reached OpenBoE's existing desktop click handler.
+set(CBOE_STARTUP_CPP "${CBOE_ANDROID_ROOT}/src/game/boe.startup.cpp")
+file(READ "${CBOE_STARTUP_CPP}" CBOE_STARTUP_SOURCE)
+set(CBOE_STARTUP_INCLUDE_OLD "#include <boost/lexical_cast.hpp>")
+set(CBOE_STARTUP_INCLUDE_NEW "#include <boost/lexical_cast.hpp>\n#include <android/log.h>")
+string(FIND "${CBOE_STARTUP_SOURCE}" "${CBOE_STARTUP_INCLUDE_OLD}" CBOE_STARTUP_INCLUDE_POS)
+if(CBOE_STARTUP_INCLUDE_POS EQUAL -1)
+    message(FATAL_ERROR "Expected OpenBoE startup include block was not found")
+endif()
+string(REPLACE "${CBOE_STARTUP_INCLUDE_OLD}" "${CBOE_STARTUP_INCLUDE_NEW}" CBOE_STARTUP_SOURCE "${CBOE_STARTUP_SOURCE}")
+set(CBOE_STARTUP_CLICK_OLD [=[void handle_startup_button_click(eStartButton btn, eKeyMod mods) {
+	if(recording){]=])
+set(CBOE_STARTUP_CLICK_NEW [=[void handle_startup_button_click(eStartButton btn, eKeyMod mods) {
+	__android_log_print(ANDROID_LOG_INFO, "OpenBoEAndroid", "STARTUP_BUTTON_CLICK %d", static_cast<int>(btn));
+	if(recording){]=])
+string(FIND "${CBOE_STARTUP_SOURCE}" "${CBOE_STARTUP_CLICK_OLD}" CBOE_STARTUP_CLICK_POS)
+if(CBOE_STARTUP_CLICK_POS EQUAL -1)
+    message(FATAL_ERROR "Expected OpenBoE startup click handler was not found")
+endif()
+string(REPLACE "${CBOE_STARTUP_CLICK_OLD}" "${CBOE_STARTUP_CLICK_NEW}" CBOE_STARTUP_SOURCE "${CBOE_STARTUP_SOURCE}")
+file(WRITE "${CBOE_STARTUP_CPP}" "${CBOE_STARTUP_SOURCE}")
+message(STATUS "Added Android startup touch-dispatch diagnostics")
 
 # Touch-backed pointer coordinates are now handled directly in OpenBoE's
 # Android-port source (src/tools/winutil.cpp and src/game/boe.actions.cpp).
