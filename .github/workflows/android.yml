@@ -219,7 +219,7 @@ jobs:
             echo "Resume PID: $(cat runtime-resume-pid.txt)"
             grep -E -i 'OpenBoEAndroid|OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc|EGL' runtime-resume-logcat.txt | tail -n 300 || true
             python3 .github/scripts/verify_android_resume.py runtime-before-resume.raw runtime-after-resume.raw
-            CENTER=$(grep 'TUTORIAL_CENTER' runtime-resume-logcat.txt | tail -n 1 | sed -E 's/.*TUTORIAL_CENTER ([0-9-]+) ([0-9-]+).*/\1 \2/')
+            CENTER=$(cat runtime-logcat.txt runtime-resume-logcat.txt | grep 'TUTORIAL_CENTER' | tail -n 1 | sed -E 's/.*TUTORIAL_CENTER ([0-9-]+) ([0-9-]+).*/\1 \2/')
             test -n "$CENTER"
             set -- $CENTER
             echo "Tapping Tutorial at $1,$2"
