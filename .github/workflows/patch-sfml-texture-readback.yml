@@ -1,0 +1,69 @@
+name: One-shot SFML GLES readback patch
+
+on:
+  push:
+    branches:
+      - android-port
+
+permissions:
+  contents: write
+
+jobs:
+  patch-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out android-port
+        uses: actions/checkout@v4
+        with:
+          ref: android-port
+
+      - name: Initialize SFML GLES extension pointers before texture readback
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("android/app/src/main/cpp/CMakeLists.txt")
+          text = path.read_text()
+          needle = '''    file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")
+
+    # Android touchscreen input should behave like the desktop left mouse.
+'''
+          replacement = '''    file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")
+
+    # SFML 2.6.2's OpenGL ES Texture::copyToImage path calls framebuffer
+    # extension entry points without first initializing SFML's extension
+    # pointers. Font atlas growth uses this path and can jump through a null
+    # function pointer on Android. Initialize the pointers before the first FBO
+    # call so texture readback works normally.
+    set(SFML_TEXTURE_CPP "${sfml_SOURCE_DIR}/src/SFML/Graphics/Texture.cpp")
+    file(READ "${SFML_TEXTURE_CPP}" SFML_TEXTURE_SOURCE)
+    set(SFML_GLES_READBACK_OLD [=[#ifdef SFML_OPENGL_ES
+
+    // OpenGL ES doesn't have the glGetTexImage function]=])
+    set(SFML_GLES_READBACK_NEW [=[#ifdef SFML_OPENGL_ES
+
+    priv::ensureExtensionsInit();
+
+    // OpenGL ES doesn't have the glGetTexImage function]=])
+    string(FIND "${SFML_TEXTURE_SOURCE}" "${SFML_GLES_READBACK_OLD}" SFML_GLES_READBACK_POS)
+    if(SFML_GLES_READBACK_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML 2.6.2 GLES Texture::copyToImage block was not found")
+    endif()
+    string(REPLACE "${SFML_GLES_READBACK_OLD}" "${SFML_GLES_READBACK_NEW}" SFML_TEXTURE_SOURCE "${SFML_TEXTURE_SOURCE}")
+    file(WRITE "${SFML_TEXTURE_CPP}" "${SFML_TEXTURE_SOURCE}")
+
+    # Android touchscreen input should behave like the desktop left mouse.
+'''
+          if needle not in text:
+              raise SystemExit("Expected SFML texture patch insertion point was not found")
+          path.write_text(text.replace(needle, replacement, 1))
+
+          Path(".github/workflows/patch-sfml-texture-readback.yml").unlink()
+
+      - name: Commit permanent GLES readback fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/cpp/CMakeLists.txt .github/workflows/patch-sfml-texture-readback.yml
+          git commit -m "Initialize SFML GLES extensions before texture readback"
+          git push origin HEAD:android-port
