@@ -52,9 +52,6 @@ jobs:
             --output android/app/src/main/jniLibs/arm64-v8a/libopenal.so
           test -s android/app/src/main/jniLibs/arm64-v8a/libopenal.so
 
-      # Android assets are not ordinary filesystem paths. android_main.cpp
-      # stages them into internalDataPath before OpenBoE starts. The explicit
-      # manifest avoids relying on Android asset-directory enumeration.
       - name: Bundle game resources
         shell: bash
         run: |
@@ -101,10 +98,9 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-  # Build an x86_64 copy only inside CI and launch it in an Android emulator.
-  # In addition to process survival, this test now verifies that Home/resume
-  # leaves the visible title screen substantially unchanged and that a real
-  # Android touchscreen tap reaches OpenBoE's startup-button handler.
+  # Build an x86_64 copy inside CI and launch it in an Android emulator.
+  # This verifies process survival, the visible Home/resume result, and a real
+  # Android touchscreen tap reaching OpenBoE's startup-button handler.
   runtime-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -209,10 +205,8 @@ jobs:
             adb logcat -d -v threadtime > runtime-logcat.txt
             adb exec-out screencap -p > runtime-before-resume.png
             adb exec-out screencap > runtime-before-resume.raw
-
             echo "Process PID: $(cat runtime-pid.txt)"
             grep -E -i 'OpenBoEAndroid|OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc' runtime-logcat.txt | tail -n 300 || true
-
             adb shell input keyevent KEYCODE_HOME
             sleep 2
             adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
@@ -222,54 +216,9 @@ jobs:
             adb exec-out screencap -p > runtime-after-resume.png
             adb exec-out screencap > runtime-after-resume.raw
             adb logcat -d -v threadtime > runtime-resume-logcat.txt
-
             echo "Resume PID: $(cat runtime-resume-pid.txt)"
             grep -E -i 'OpenBoEAndroid|OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc|EGL' runtime-resume-logcat.txt | tail -n 300 || true
-
-            # Compare raw RGBA screencaps using only Python's standard library.
-            # A black resume screen or the old tiny Welcome dialog changes a
-            # large portion of the screen even though the process remains alive.
-            python3 - <<'PY'
-            import struct
-
-            def load(path):
-                data = open(path, 'rb').read()
-                if len(data) < 12:
-                    raise SystemExit(f'{path}: screencap too short')
-                w, h, _fmt = struct.unpack_from('<III', data, 0)
-                n = w * h * 4
-                if w <= 0 or h <= 0 or len(data) < n:
-                    raise SystemExit(f'{path}: invalid screencap dimensions {w}x{h}')
-                return w, h, data[-n:]
-
-            w1, h1, a = load('runtime-before-resume.raw')
-            w2, h2, b = load('runtime-after-resume.raw')
-            if (w1, h1) != (w2, h2):
-                raise SystemExit(f'resume screenshot dimensions changed: {w1}x{h1} -> {w2}x{h2}')
-
-            pixels = w1 * h1
-            changed = 0
-            nonblack = 0
-            for i in range(0, len(b), 4):
-                br, bg, bb = b[i], b[i+1], b[i+2]
-                if max(br, bg, bb) > 20:
-                    nonblack += 1
-                if max(abs(a[i]-br), abs(a[i+1]-bg), abs(a[i+2]-bb)) > 45:
-                    changed += 1
-
-            changed_ratio = changed / pixels
-            nonblack_ratio = nonblack / pixels
-            print(f'resume changed-pixel ratio: {changed_ratio:.4f}')
-            print(f'resume nonblack ratio: {nonblack_ratio:.4f}')
-            if nonblack_ratio < 0.08:
-                raise SystemExit('resume screen is effectively black')
-            if changed_ratio > 0.15:
-                raise SystemExit('resume screen differs too much from the pre-background title screen')
-            PY
-
-            # The Android build logs the exact pixel center of Tutorial after
-            # drawing the title screen. Tap that coordinate through adb, then
-            # require the existing startup click handler to report the tap.
+            python3 .github/scripts/verify_android_resume.py runtime-before-resume.raw runtime-after-resume.raw
             CENTER=$(grep 'TUTORIAL_CENTER' runtime-resume-logcat.txt | tail -n 1 | sed -E 's/.*TUTORIAL_CENTER ([0-9-]+) ([0-9-]+).*/\1 \2/')
             test -n "$CENTER"
             set -- $CENTER
