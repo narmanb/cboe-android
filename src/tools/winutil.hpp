@@ -36,6 +36,10 @@ void _setWindowFloating(sf::Window& win, bool floating);
 bool pollEvent(sf::Window& win, sf::Event& event);
 bool pollEvent(sf::Window* win, sf::Event& event);
 
+// Returns the latest pointer position in window pixels. On Android this is
+// updated from touch/mouse events so code does not depend on a hardware mouse.
+sf::Vector2i get_pointer_position(sf::Window& win);
+
 void init_fileio();
 void launchURL(std::string url);
 // Open a documentation page relative to packaged HTML if available,
