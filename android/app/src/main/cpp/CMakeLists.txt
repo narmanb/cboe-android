@@ -26,18 +26,18 @@ FetchContent_Declare(
     SFML
     URL https://github.com/SFML/SFML/archive/refs/tags/2.6.2.tar.gz
 )
-# Populate SFML first so we can apply a small Android-only source fix before
-# its targets are configured. SFML 2.6.2 constructs Font::Page through a
-# temporary std::pair; because sf::Texture is copy-only in SFML 2, that copies
-# the glyph texture and calls Texture::copyToImage(). The OpenGL ES readback
-# path crashes on Android during the first TGUI glyph. Construct the page in
-# place instead so no texture copy/readback occurs.
+# Populate SFML first so we can apply Android-only fixes before its targets are
+# configured. These changes keep the desktop game code intact while working
+# around SFML 2.6.2 assumptions that do not hold reliably for NativeActivity.
 FetchContent_GetProperties(SFML)
 if(NOT sfml_POPULATED)
     FetchContent_Populate(SFML)
 
     set(SFML_FONT_CPP "${sfml_SOURCE_DIR}/src/SFML/Graphics/Font.cpp")
     file(READ "${SFML_FONT_CPP}" SFML_FONT_SOURCE)
+
+    # Construct Font::Page directly in the map. SFML 2.6.2 otherwise copies a
+    # temporary Page, which copies sf::Texture and invokes GLES readback.
     set(SFML_FONT_OLD "pageIterator = m_pages.insert(std::make_pair(characterSize, Page(m_isSmooth))).first;")
     set(SFML_FONT_NEW "pageIterator = m_pages.emplace(std::piecewise_construct, std::forward_as_tuple(characterSize), std::forward_as_tuple(m_isSmooth)).first;")
     string(FIND "${SFML_FONT_SOURCE}" "${SFML_FONT_OLD}" SFML_FONT_PATCH_POS)
@@ -45,11 +45,59 @@ if(NOT sfml_POPULATED)
         message(FATAL_ERROR "Expected SFML 2.6.2 Font::loadPage insertion was not found")
     endif()
     string(REPLACE "${SFML_FONT_OLD}" "${SFML_FONT_NEW}" SFML_FONT_SOURCE "${SFML_FONT_SOURCE}")
+
+    # The stock 128x128 atlas fills almost immediately with OpenBoE's UI text,
+    # forcing Texture::update(Texture) and GLES framebuffer readback. A 512x512
+    # atlas is still only 1 MiB RGBA per active character size and is large
+    # enough for the game's normal Latin UI without constant atlas resizing.
+    set(SFML_FONT_ATLAS_OLD "image.create(128, 128, Color(255, 255, 255, 0));")
+    set(SFML_FONT_ATLAS_NEW "image.create(512, 512, Color(255, 255, 255, 0));")
+    string(FIND "${SFML_FONT_SOURCE}" "${SFML_FONT_ATLAS_OLD}" SFML_FONT_ATLAS_POS)
+    if(SFML_FONT_ATLAS_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML 2.6.2 initial font atlas size was not found")
+    endif()
+    string(REPLACE "${SFML_FONT_ATLAS_OLD}" "${SFML_FONT_ATLAS_NEW}" SFML_FONT_SOURCE "${SFML_FONT_SOURCE}")
     file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")
 
-    # SFML 2.6.2 GLES Texture::copyToImage uses framebuffer extension entry points
-    # before ensuring SFML has initialized those pointers. Font atlas growth reaches
-    # this readback path, so initialize extensions before the first FBO call.
+    # SFML 2.6.2 marks its GL extension loader initialized before it knows that
+    # gladLoadGLES1 actually succeeded. NativeActivity can reach this code while
+    # Android is still creating the first usable EGL surface, permanently leaving
+    # OES framebuffer function pointers null. Keep initialized=false when GLAD
+    # reports no GLES context so a later call with the real window can retry.
+    set(SFML_GLEXT_CPP "${sfml_SOURCE_DIR}/src/SFML/Graphics/GLExtensions.cpp")
+    file(READ "${SFML_GLEXT_CPP}" SFML_GLEXT_SOURCE)
+    set(SFML_GLEXT_OLD [=[        initialized = true;
+
+#ifdef SFML_OPENGL_ES
+        gladLoadGLES1(reinterpret_cast<GLADloadfunc>(sf::Context::getFunction));
+#else
+        gladLoadGL(reinterpret_cast<GLADloadfunc>(sf::Context::getFunction));
+#endif
+
+        // Retrieve the context version number]=])
+    set(SFML_GLEXT_NEW [=[#ifdef SFML_OPENGL_ES
+        const int loadedVersion = gladLoadGLES1(reinterpret_cast<GLADloadfunc>(sf::Context::getFunction));
+#ifdef SFML_SYSTEM_ANDROID
+        if (loadedVersion == 0)
+            return;
+#endif
+#else
+        gladLoadGL(reinterpret_cast<GLADloadfunc>(sf::Context::getFunction));
+#endif
+
+        initialized = true;
+
+        // Retrieve the context version number]=])
+    string(FIND "${SFML_GLEXT_SOURCE}" "${SFML_GLEXT_OLD}" SFML_GLEXT_PATCH_POS)
+    if(SFML_GLEXT_PATCH_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML 2.6.2 extension initialization block was not found")
+    endif()
+    string(REPLACE "${SFML_GLEXT_OLD}" "${SFML_GLEXT_NEW}" SFML_GLEXT_SOURCE "${SFML_GLEXT_SOURCE}")
+    file(WRITE "${SFML_GLEXT_CPP}" "${SFML_GLEXT_SOURCE}")
+
+    # Texture::copyToImage can be reached if a font page eventually grows past
+    # the larger Android atlas. Make sure extension loading has had a chance to
+    # retry after the real EGL context exists before using OES framebuffer calls.
     set(SFML_TEXTURE_CPP "${sfml_SOURCE_DIR}/src/SFML/Graphics/Texture.cpp")
     file(READ "${SFML_TEXTURE_CPP}" SFML_TEXTURE_SOURCE)
     set(SFML_GLES_READBACK_OLD [=[#ifdef SFML_OPENGL_ES
