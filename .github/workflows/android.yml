@@ -43,10 +43,6 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      # SFML links its Android audio library against a prebuilt OpenAL shared
-      # library. CMake can link it from SFML's FetchContent tree, but AGP does
-      # not automatically package that imported .so into the APK. Put the
-      # arm64 library in the conventional jniLibs directory before packaging.
       - name: Bundle OpenAL runtime
         shell: bash
         run: |
@@ -56,10 +52,9 @@ jobs:
             --output android/app/src/main/jniLibs/arm64-v8a/libopenal.so
           test -s android/app/src/main/jniLibs/arm64-v8a/libopenal.so
 
-      # The desktop build installs these folders beside the executable as
-      # data/{graphics,sounds,...}. Android assets are not normal filesystem
-      # paths, so android_main.cpp copies them into internalDataPath/data on
-      # first launch before the portable OpenBoE main function runs.
+      # Android assets are not ordinary filesystem paths. android_main.cpp
+      # stages them into internalDataPath before OpenBoE starts. The explicit
+      # manifest avoids relying on Android asset-directory enumeration.
       - name: Bundle game resources
         shell: bash
         run: |
@@ -80,6 +75,9 @@ jobs:
           cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
           cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
           cp src/gfx/mask.frag src/gfx/mask.vert android/app/src/main/assets/data/shaders/
+          (cd android/app/src/main/assets && find data -type f ! -name 'assets-manifest.txt' -print | sort > data/assets-manifest.txt)
+          test -s android/app/src/main/assets/data/assets-manifest.txt
+          grep -qx 'data/fonts/bold.ttf' android/app/src/main/assets/data/assets-manifest.txt
 
       - name: Build debug APK
         shell: bash
@@ -103,9 +101,9 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-  # Build an x86_64 copy only inside CI and launch it in a real Android
-  # emulator. This gives us logcat/tombstone output for startup crashes without
-  # needing the tester to connect their phone to adb.
+  # Build an x86_64 copy only inside CI and launch it in an Android emulator.
+  # This gives us real startup logcat/tombstones without requiring a tester's
+  # phone to be attached to adb.
   runtime-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -174,6 +172,9 @@ jobs:
           cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
           cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
           cp src/gfx/mask.frag src/gfx/mask.vert android/app/src/main/assets/data/shaders/
+          (cd android/app/src/main/assets && find data -type f ! -name 'assets-manifest.txt' -print | sort > data/assets-manifest.txt)
+          test -s android/app/src/main/assets/data/assets-manifest.txt
+          grep -qx 'data/fonts/bold.ttf' android/app/src/main/assets/data/assets-manifest.txt
 
       - name: Build emulator APK
         shell: bash
