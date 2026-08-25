@@ -1,0 +1,43 @@
+name: One-shot Android window icon patch
+
+on:
+  push:
+    branches:
+      - android-port
+
+permissions:
+  contents: write
+
+jobs:
+  patch-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out android-port
+        uses: actions/checkout@v4
+        with:
+          ref: android-port
+
+      - name: Skip desktop icon readback on Android
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/game/boe.graphics.cpp")
+          text = path.read_text()
+          old = '#ifndef __APPLE__ // This overrides Dock icon on OSX, which isn\'t what we want at all\n\tconst ImageRsrc& icon = ResMgr::graphics.get("icon", true);\n\tmainPtr().setIcon(icon->getSize().x, icon->getSize().y, icon->copyToImage().getPixelsPtr());\n#endif'
+          new = '#if !defined(__APPLE__) && !defined(__ANDROID__) // Desktop window icons are not used by Android\n\tconst ImageRsrc& icon = ResMgr::graphics.get("icon", true);\n\tmainPtr().setIcon(icon->getSize().x, icon->getSize().y, icon->copyToImage().getPixelsPtr());\n#endif'
+          if old not in text:
+              raise SystemExit("Expected window-icon block was not found; refusing to patch a different revision")
+          path.write_text(text.replace(old, new, 1))
+
+          # This workflow is deliberately one-shot. Remove it in the same commit
+          # that carries the real source change so it cannot loop on its own push.
+          Path(".github/workflows/source-patch.yml").unlink()
+
+      - name: Commit source fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/boe.graphics.cpp .github/workflows/source-patch.yml
+          git commit -m "Skip desktop window icon setup on Android"
+          git push origin HEAD:android-port
