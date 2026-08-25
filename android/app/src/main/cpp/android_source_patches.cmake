@@ -25,18 +25,7 @@ string(REPLACE "${CBOE_STARTANIM_COPY_OLD}" "${CBOE_STARTANIM_COPY_NEW}" CBOE_GR
 file(WRITE "${CBOE_GRAPHICS_CPP}" "${CBOE_GRAPHICS_SOURCE}")
 message(STATUS "Applied Android draw_startup_anim texture-reference patch")
 
-# Much of OpenBoE's desktop click handling asks sf::Mouse for the current
-# pointer location instead of using the coordinates carried by the event.
-# Android has no hardware mouse, so use the position tracked by pollEvent(),
-# which is updated from either native touch events or synthesized mouse events.
-set(CBOE_ACTIONS_CPP "${CBOE_ANDROID_ROOT}/src/game/boe.actions.cpp")
-file(READ "${CBOE_ACTIONS_CPP}" CBOE_ACTIONS_SOURCE)
-set(CBOE_MOUSE_POS_OLD "location where_curs = sf::Mouse::getPosition(mainPtr());")
-set(CBOE_MOUSE_POS_NEW "location where_curs = get_pointer_position(mainPtr());")
-string(FIND "${CBOE_ACTIONS_SOURCE}" "${CBOE_MOUSE_POS_OLD}" CBOE_MOUSE_POS_POS)
-if(CBOE_MOUSE_POS_POS EQUAL -1)
-    message(FATAL_ERROR "Expected OpenBoE mouse_window_coords implementation was not found")
-endif()
-string(REPLACE "${CBOE_MOUSE_POS_OLD}" "${CBOE_MOUSE_POS_NEW}" CBOE_ACTIONS_SOURCE "${CBOE_ACTIONS_SOURCE}")
-file(WRITE "${CBOE_ACTIONS_CPP}" "${CBOE_ACTIONS_SOURCE}")
-message(STATUS "Applied Android tracked-pointer patch")
+# Touch-backed pointer coordinates are now handled directly in OpenBoE's
+# Android-port source (src/tools/winutil.cpp and src/game/boe.actions.cpp).
+# Keeping a second text-replacement patch here would fail once the permanent
+# source fix is already present, so no pointer source rewrite is needed here.
