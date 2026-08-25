@@ -1,1 +1,2 @@
-This marker triggers CI after the Android touch-to-mouse SFML patch.
+This marker triggers CI after Android input/runtime patches.
+GLES texture readback extension initialization test.
