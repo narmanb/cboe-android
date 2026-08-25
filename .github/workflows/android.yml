@@ -189,7 +189,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Launch app and capture logcat
+      - name: Launch, background, and resume app
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -207,6 +207,17 @@ jobs:
             echo "Process PID: $(cat runtime-pid.txt 2>/dev/null || true)"
             grep -E -i 'OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc' runtime-logcat.txt | tail -n 300 || true
             test -s runtime-pid.txt
+            adb exec-out screencap -p > runtime-before-resume.png
+            adb shell input keyevent KEYCODE_HOME
+            sleep 2
+            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
+            sleep 5
+            adb exec-out screencap -p > runtime-after-resume.png
+            adb shell pidof org.openboe.cboe.android > runtime-resume-pid.txt || true
+            adb logcat -d -v threadtime > runtime-resume-logcat.txt
+            echo "Resume PID: $(cat runtime-resume-pid.txt 2>/dev/null || true)"
+            grep -E -i 'OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc|EGL' runtime-resume-logcat.txt | tail -n 300 || true
+            test -s runtime-resume-pid.txt
 
       - name: Upload runtime diagnostics
         if: always()
@@ -216,5 +227,9 @@ jobs:
           path: |
             runtime-logcat.txt
             runtime-pid.txt
+            runtime-resume-pid.txt
+            runtime-resume-logcat.txt
+            runtime-before-resume.png
+            runtime-after-resume.png
             android-emulator-build.log
           if-no-files-found: warn
