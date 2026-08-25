@@ -98,4 +98,47 @@ function(cboe_restore_sfml_android_lifecycle_context)
     message(STATUS "Restored stock SFML Android EGL lifecycle ownership after single-window conversion")
 endfunction()
 
+# SFML 2.6.2 stores pending Android surface creation and destruction as two
+# independent booleans. During a quick Home -> resume, LostFocus and GainedFocus
+# can both arrive before processEvents() consumes either transition. With stock
+# code that leaves both flags true, processEvents() creates the new EGL window
+# surface and then immediately destroys it, so every later setActive() fails.
+# Treat the latest focus edge as authoritative by cancelling the opposite
+# pending transition when each event is queued.
+function(cboe_patch_sfml_android_focus_transition_coalescing)
+    FetchContent_GetProperties(SFML)
+    if(NOT sfml_POPULATED OR NOT EXISTS "${sfml_SOURCE_DIR}/src/SFML/Window/Android/WindowImplAndroid.cpp")
+        message(FATAL_ERROR "SFML Android window source was not populated before lifecycle patch")
+    endif()
+
+    set(SFML_ANDROID_WINDOW_CPP "${sfml_SOURCE_DIR}/src/SFML/Window/Android/WindowImplAndroid.cpp")
+    file(READ "${SFML_ANDROID_WINDOW_CPP}" SFML_ANDROID_WINDOW_SOURCE)
+
+    set(SFML_GAINED_FOCUS_OLD [=[            WindowImplAndroid::singleInstance->m_windowBeingCreated = true;
+            WindowImplAndroid::singleInstance->m_hasFocus = true;]=])
+    set(SFML_GAINED_FOCUS_NEW [=[            WindowImplAndroid::singleInstance->m_windowBeingDestroyed = false;
+            WindowImplAndroid::singleInstance->m_windowBeingCreated = true;
+            WindowImplAndroid::singleInstance->m_hasFocus = true;]=])
+    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_GAINED_FOCUS_OLD}" SFML_GAINED_FOCUS_POS)
+    if(SFML_GAINED_FOCUS_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML Android GainedFocus lifecycle block was not found")
+    endif()
+    string(REPLACE "${SFML_GAINED_FOCUS_OLD}" "${SFML_GAINED_FOCUS_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
+
+    set(SFML_LOST_FOCUS_OLD [=[            WindowImplAndroid::singleInstance->m_windowBeingDestroyed = true;
+            WindowImplAndroid::singleInstance->m_hasFocus = false;]=])
+    set(SFML_LOST_FOCUS_NEW [=[            WindowImplAndroid::singleInstance->m_windowBeingCreated = false;
+            WindowImplAndroid::singleInstance->m_windowBeingDestroyed = true;
+            WindowImplAndroid::singleInstance->m_hasFocus = false;]=])
+    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_LOST_FOCUS_OLD}" SFML_LOST_FOCUS_POS)
+    if(SFML_LOST_FOCUS_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML Android LostFocus lifecycle block was not found")
+    endif()
+    string(REPLACE "${SFML_LOST_FOCUS_OLD}" "${SFML_LOST_FOCUS_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
+
+    file(WRITE "${SFML_ANDROID_WINDOW_CPP}" "${SFML_ANDROID_WINDOW_SOURCE}")
+    message(STATUS "Patched SFML Android rapid focus surface transition coalescing")
+endfunction()
+
 cmake_language(DEFER CALL cboe_restore_sfml_android_lifecycle_context)
+cmake_language(DEFER CALL cboe_patch_sfml_android_focus_transition_coalescing)
