@@ -203,7 +203,7 @@ void adjust_window_mode() {
 	sf::FloatRect mainPort = compute_viewport(p, mode, ui_scale, width, height);
 	mainView.setViewport(mainPort);
 	
-#ifndef __APPLE__ // This overrides Dock icon on OSX, which isn't what we want at all
+#if !defined(__APPLE__) && !defined(__ANDROID__) // Desktop window icons are not used by Android
 	const ImageRsrc& icon = ResMgr::graphics.get("icon", true);
 	mainPtr().setIcon(icon->getSize().x, icon->getSize().y, icon->copyToImage().getPixelsPtr());
 #endif
