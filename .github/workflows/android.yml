@@ -102,3 +102,118 @@ jobs:
           name: cboe-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  # Build an x86_64 copy only inside CI and launch it in a real Android
+  # emulator. This gives us logcat/tombstone output for startup crashes without
+  # needing the tester to connect their phone to adb.
+  runtime-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize required submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init deps/TGUI deps/Catch2 deps/cppcodec deps/fmtlib
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Select emulator ABI
+        shell: bash
+        run: |
+          sed -i 's/abiFilters "arm64-v8a"/abiFilters "x86_64"/' android/app/build.gradle
+          grep -n 'abiFilters' android/app/build.gradle
+
+      - name: Bundle x86_64 OpenAL runtime
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/SFML/SFML/2.6.2/extlibs/libs-android/x86_64/libopenal.so \
+            --output android/app/src/main/jniLibs/x86_64/libopenal.so
+          test -s android/app/src/main/jniLibs/x86_64/libopenal.so
+
+      - name: Bundle game resources
+        shell: bash
+        run: |
+          rm -rf android/app/src/main/assets/data
+          mkdir -p \
+            android/app/src/main/assets/data/cursors \
+            android/app/src/main/assets/data/dialogs \
+            android/app/src/main/assets/data/fonts \
+            android/app/src/main/assets/data/graphics \
+            android/app/src/main/assets/data/sounds \
+            android/app/src/main/assets/data/strings \
+            android/app/src/main/assets/data/shaders
+          cp rsrc/cursors/*.gif android/app/src/main/assets/data/cursors/
+          cp rsrc/dialogs/*.xml android/app/src/main/assets/data/dialogs/
+          cp rsrc/fonts/*.ttf android/app/src/main/assets/data/fonts/
+          find rsrc/fonts -maxdepth 1 -type f -name '*.bdf' -exec cp {} android/app/src/main/assets/data/fonts/ \;
+          cp rsrc/graphics/*.png android/app/src/main/assets/data/graphics/
+          cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
+          cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
+          cp src/gfx/mask.frag src/gfx/mask.vert android/app/src/main/assets/data/shaders/
+
+      - name: Build emulator APK
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle -p android :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee android-emulator-build.log
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch app and capture logcat
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: Nexus 6
+          disable-animations: true
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
+            sleep 8
+            adb shell pidof org.openboe.cboe.android > runtime-pid.txt || true
+            adb logcat -d -v threadtime > runtime-logcat.txt
+            echo "Process PID: $(cat runtime-pid.txt 2>/dev/null || true)"
+            grep -E -i 'OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc' runtime-logcat.txt | tail -n 300 || true
+            test -s runtime-pid.txt
+
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-runtime-diagnostics
+          path: |
+            runtime-logcat.txt
+            runtime-pid.txt
+            android-emulator-build.log
+          if-no-files-found: warn
