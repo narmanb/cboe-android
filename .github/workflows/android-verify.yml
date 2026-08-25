@@ -1,0 +1,162 @@
+name: Android Touch + Resume Verify
+
+on:
+  push:
+    branches:
+      - android-port
+  workflow_dispatch:
+
+jobs:
+  verify-android-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize required submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init deps/TGUI deps/Catch2 deps/cppcodec deps/fmtlib
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Select emulator ABI
+        shell: bash
+        run: |
+          sed -i 's/abiFilters "arm64-v8a"/abiFilters "x86_64"/' android/app/build.gradle
+          grep -n 'abiFilters' android/app/build.gradle
+
+      - name: Bundle x86_64 OpenAL runtime
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/SFML/SFML/2.6.2/extlibs/libs-android/x86_64/libopenal.so \
+            --output android/app/src/main/jniLibs/x86_64/libopenal.so
+          test -s android/app/src/main/jniLibs/x86_64/libopenal.so
+
+      - name: Bundle game resources
+        shell: bash
+        run: |
+          rm -rf android/app/src/main/assets/data
+          mkdir -p \
+            android/app/src/main/assets/data/cursors \
+            android/app/src/main/assets/data/dialogs \
+            android/app/src/main/assets/data/fonts \
+            android/app/src/main/assets/data/graphics \
+            android/app/src/main/assets/data/sounds \
+            android/app/src/main/assets/data/strings \
+            android/app/src/main/assets/data/shaders
+          cp rsrc/cursors/*.gif android/app/src/main/assets/data/cursors/
+          cp rsrc/dialogs/*.xml android/app/src/main/assets/data/dialogs/
+          cp rsrc/fonts/*.ttf android/app/src/main/assets/data/fonts/
+          find rsrc/fonts -maxdepth 1 -type f -name '*.bdf' -exec cp {} android/app/src/main/assets/data/fonts/ \;
+          cp rsrc/graphics/*.png android/app/src/main/assets/data/graphics/
+          cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
+          cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
+          cp src/gfx/mask.frag src/gfx/mask.vert android/app/src/main/assets/data/shaders/
+          (cd android/app/src/main/assets && find data -type f ! -name 'assets-manifest.txt' -print | sort > data/assets-manifest.txt)
+          test -s android/app/src/main/assets/data/assets-manifest.txt
+
+      - name: Build emulator APK
+        shell: bash
+        run: gradle -p android :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify title touch and Home resume
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: Nexus 6
+          disable-animations: true
+          script: |
+            set -eu
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
+            sleep 8
+            adb shell pidof org.openboe.cboe.android > verify-pid-before.txt
+            test -s verify-pid-before.txt
+            adb logcat -d -v threadtime > verify-before.log
+            adb exec-out screencap > verify-before.raw
+
+            # Background and immediately restore the same NativeActivity.
+            adb shell input keyevent KEYCODE_HOME
+            sleep 1
+            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
+            sleep 5
+            adb shell pidof org.openboe.cboe.android > verify-pid-after.txt
+            test -s verify-pid-after.txt
+            cmp -s verify-pid-before.txt verify-pid-after.txt || {
+              echo "Process PID changed across resume" >&2
+              exit 1
+            }
+            adb logcat -d -v threadtime > verify-after-resume.log
+            adb exec-out screencap > verify-after.raw
+
+            python3 .github/scripts/verify_android_resume.py verify-before.raw verify-after.raw
+
+            # Parse the last logged Tutorial center without a grep/sed pipeline.
+            CENTER=$(python3 - <<'PY'
+            import re
+            text = open('verify-after-resume.log', errors='replace').read()
+            matches = re.findall(r'TUTORIAL_CENTER\s+(-?\d+)\s+(-?\d+)', text)
+            if not matches:
+                raise SystemExit('TUTORIAL_CENTER was not found in the complete runtime log')
+            print(*matches[-1])
+            PY
+            )
+            set -- $CENTER
+            echo "Tapping Tutorial at $1,$2"
+            adb shell input tap "$1" "$2"
+            sleep 2
+            adb logcat -d -v threadtime > verify-after-tap.log
+            grep -q 'STARTUP_BUTTON_CLICK' verify-after-tap.log || {
+              echo "Android tap did not reach handle_startup_button_click" >&2
+              grep -E 'TUTORIAL_CENTER|STARTUP_BUTTON_CLICK|OpenBoEAndroid|sfml-error|EGL' verify-after-tap.log | tail -n 200 || true
+              exit 1
+            }
+            grep 'STARTUP_BUTTON_CLICK' verify-after-tap.log | tail -n 5
+
+      - name: Upload verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-touch-resume-verification
+          path: |
+            verify-pid-before.txt
+            verify-pid-after.txt
+            verify-before.log
+            verify-after-resume.log
+            verify-after-tap.log
+            verify-before.raw
+            verify-after.raw
+          if-no-files-found: warn
