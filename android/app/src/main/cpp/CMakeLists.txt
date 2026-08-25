@@ -171,6 +171,37 @@ if(NOT sfml_POPULATED)
     string(REPLACE "${SFML_TOUCH_DOWN_OLD}" "${SFML_TOUCH_DOWN_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
     string(REPLACE "${SFML_TOUCH_UP_OLD}" "${SFML_TOUCH_UP_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
     string(REPLACE "${SFML_TOUCH_MOVE_OLD}" "${SFML_TOUCH_MOVE_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
+
+    # SFML's Android backend was designed around one RenderWindow and keeps a
+    # global singleInstance pointer. OpenBoE creates temporary desktop-style
+    # dialog windows, which replace that pointer. After a dialog closes, touch
+    # and lifecycle events can therefore be sent to the wrong/closed window.
+    # Make whichever SFML window is actively polling Android events reclaim the
+    # pointer, and do not let destruction of a stale dialog clear a newer owner.
+    set(SFML_PROCESS_EVENTS_OLD [=[void WindowImplAndroid::processEvents()
+{
+    // Process incoming OS events]=])
+    set(SFML_PROCESS_EVENTS_NEW [=[void WindowImplAndroid::processEvents()
+{
+    WindowImplAndroid::singleInstance = this;
+
+    // Process incoming OS events]=])
+    set(SFML_DESTRUCTOR_OLD [=[WindowImplAndroid::~WindowImplAndroid()
+{
+    WindowImplAndroid::singleInstance = NULL;
+}]=])
+    set(SFML_DESTRUCTOR_NEW [=[WindowImplAndroid::~WindowImplAndroid()
+{
+    if (WindowImplAndroid::singleInstance == this)
+        WindowImplAndroid::singleInstance = NULL;
+}]=])
+    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_PROCESS_EVENTS_OLD}" SFML_PROCESS_EVENTS_POS)
+    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_DESTRUCTOR_OLD}" SFML_DESTRUCTOR_POS)
+    if(SFML_PROCESS_EVENTS_POS EQUAL -1 OR SFML_DESTRUCTOR_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML 2.6.2 Android single-window routing blocks were not found")
+    endif()
+    string(REPLACE "${SFML_PROCESS_EVENTS_OLD}" "${SFML_PROCESS_EVENTS_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
+    string(REPLACE "${SFML_DESTRUCTOR_OLD}" "${SFML_DESTRUCTOR_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
     file(WRITE "${SFML_ANDROID_WINDOW_CPP}" "${SFML_ANDROID_WINDOW_SOURCE}")
 
     add_subdirectory("${sfml_SOURCE_DIR}" "${sfml_BINARY_DIR}")
