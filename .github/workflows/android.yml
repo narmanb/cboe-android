@@ -74,7 +74,8 @@ jobs:
             android/app/src/main/assets/data/shaders
           cp rsrc/cursors/*.gif android/app/src/main/assets/data/cursors/
           cp rsrc/dialogs/*.xml android/app/src/main/assets/data/dialogs/
-          cp rsrc/fonts/*.ttf rsrc/fonts/*.bdf android/app/src/main/assets/data/fonts/
+          cp rsrc/fonts/*.ttf android/app/src/main/assets/data/fonts/
+          find rsrc/fonts -maxdepth 1 -type f -name '*.bdf' -exec cp {} android/app/src/main/assets/data/fonts/ \;
           cp rsrc/graphics/*.png android/app/src/main/assets/data/graphics/
           cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
           cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
@@ -92,7 +93,7 @@ jobs:
         with:
           name: android-build-log
           path: android-build.log
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Upload debug APK
         if: success()
