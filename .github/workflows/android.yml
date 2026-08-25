@@ -43,6 +43,19 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
+      # SFML links its Android audio library against a prebuilt OpenAL shared
+      # library. CMake can link it from SFML's FetchContent tree, but AGP does
+      # not automatically package that imported .so into the APK. Put the
+      # arm64 library in the conventional jniLibs directory before packaging.
+      - name: Bundle OpenAL runtime
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/SFML/SFML/2.6.2/extlibs/libs-android/arm64-v8a/libopenal.so \
+            --output android/app/src/main/jniLibs/arm64-v8a/libopenal.so
+          test -s android/app/src/main/jniLibs/arm64-v8a/libopenal.so
+
       - name: Build debug APK
         shell: bash
         run: |
