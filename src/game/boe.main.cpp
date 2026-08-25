@@ -1398,6 +1398,10 @@ void handle_one_event(const sf::Event& event, cFramerateLimiter& fps_limiter) {
 			break;
 			
 		case sf::Event::GainedFocus:
+#ifdef __ANDROID__
+			mainPtr().setActive(true);
+			mainPtr().setView(mainView);
+#endif
 			check_window_moved(mainPtr(), last_window_x, last_window_y, "MainWindow");
 			main_window_gained_focus = true;
 			makeFrontWindow(mainPtr(), mini_map());

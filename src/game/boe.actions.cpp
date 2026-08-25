@@ -1534,7 +1534,7 @@ void update_item_stats_area(bool& need_reprint) {
 }
 
 location mouse_window_coords() {
-	location where_curs = sf::Mouse::getPosition(mainPtr());
+	location where_curs = get_pointer_position(mainPtr());
 	where_curs = mainPtr().mapPixelToCoords(where_curs, mainView);
 	return where_curs;
 }
