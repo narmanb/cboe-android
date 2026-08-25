@@ -198,6 +198,7 @@ target_link_libraries(cboe PRIVATE
     sfml-audio
     sfml-network
     sfml-system
+    GLESv1_CM
     z
     android
     log
