@@ -98,52 +98,31 @@ jobs:
           profile: Nexus 6
           disable-animations: true
           script: |
-            set -eu
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
-            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
+            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity
             sleep 8
             adb shell pidof org.openboe.cboe.android > verify-pid-before.txt
             test -s verify-pid-before.txt
             adb logcat -d -v threadtime > verify-before.log
             adb exec-out screencap > verify-before.raw
-
-            # Background and immediately restore the same NativeActivity.
             adb shell input keyevent KEYCODE_HOME
             sleep 1
-            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true
+            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity
             sleep 5
             adb shell pidof org.openboe.cboe.android > verify-pid-after.txt
             test -s verify-pid-after.txt
-            cmp -s verify-pid-before.txt verify-pid-after.txt || {
-              echo "Process PID changed across resume" >&2
-              exit 1
-            }
+            test "$(cat verify-pid-before.txt)" = "$(cat verify-pid-after.txt)"
             adb logcat -d -v threadtime > verify-after-resume.log
             adb exec-out screencap > verify-after.raw
-
             python3 .github/scripts/verify_android_resume.py verify-before.raw verify-after.raw
-
-            # Parse the last logged Tutorial center without a grep/sed pipeline.
-            CENTER=$(python3 - <<'PY'
-            import re
-            text = open('verify-after-resume.log', errors='replace').read()
-            matches = re.findall(r'TUTORIAL_CENTER\s+(-?\d+)\s+(-?\d+)', text)
-            if not matches:
-                raise SystemExit('TUTORIAL_CENTER was not found in the complete runtime log')
-            print(*matches[-1])
-            PY
-            )
-            set -- $CENTER
-            echo "Tapping Tutorial at $1,$2"
-            adb shell input tap "$1" "$2"
+            python3 -c "import re; t=open('verify-after-resume.log',errors='replace').read(); m=re.findall(r'TUTORIAL_CENTER\\s+(-?\\d+)\\s+(-?\\d+)',t); assert m, 'TUTORIAL_CENTER missing'; print(*m[-1])" > tutorial-center.txt
+            test -s tutorial-center.txt
+            echo "Tapping Tutorial at $(cat tutorial-center.txt)"
+            adb shell input tap $(cat tutorial-center.txt)
             sleep 2
             adb logcat -d -v threadtime > verify-after-tap.log
-            grep -q 'STARTUP_BUTTON_CLICK' verify-after-tap.log || {
-              echo "Android tap did not reach handle_startup_button_click" >&2
-              grep -E 'TUTORIAL_CENTER|STARTUP_BUTTON_CLICK|OpenBoEAndroid|sfml-error|EGL' verify-after-tap.log | tail -n 200 || true
-              exit 1
-            }
+            grep -q 'STARTUP_BUTTON_CLICK' verify-after-tap.log
             grep 'STARTUP_BUTTON_CLICK' verify-after-tap.log | tail -n 5
 
       - name: Upload verification diagnostics
@@ -154,6 +133,7 @@ jobs:
           path: |
             verify-pid-before.txt
             verify-pid-after.txt
+            tutorial-center.txt
             verify-before.log
             verify-after-resume.log
             verify-after-tap.log
