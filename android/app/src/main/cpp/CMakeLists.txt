@@ -176,6 +176,7 @@ target_include_directories(cboe PRIVATE
     "${CBOE_ROOT}/deps/cppcodec"
     "${CBOE_ROOT}/deps/fmtlib/include"
     "${SFML_SOURCE_DIR}/src"
+    "${SFML_SOURCE_DIR}/extlibs/headers/glad/include"
 )
 
 target_compile_definitions(cboe PRIVATE TIXML_USE_TICPP)
