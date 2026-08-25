@@ -16,10 +16,20 @@
 #include "gfx/render_text.hpp"
 #include "winutil.hpp"
 
-sf::Shader maskShader;
+// sf::Shader inherits sf::GlResource. On Android, constructing a Shader while
+// libcboe.so is being loaded happens before SFML has installed its Activity
+// state, which aborts in sf::priv::getActivity(). Keep the shader lazy so its
+// first construction happens from init_shaders(), after SFML has entered the
+// application's main function.
+static sf::Shader& get_mask_shader() {
+	static sf::Shader shader;
+	return shader;
+}
+
 extern fs::path progDir;
 
 void init_shaders() {
+	sf::Shader& maskShader = get_mask_shader();
 	fs::path shaderPath = progDir/"data"/"shaders";
 	fs::path fragPath = shaderPath/"mask.frag", vertPath = shaderPath/"mask.vert";
 	
@@ -119,6 +129,7 @@ void rect_draw_some_item(const sf::Texture& src_gworld,rectangle src_rect,const 
 	rect_draw_some_item(src_gworld, src_rect, src, dest_rect);
 	src.display();
 	
+	sf::Shader& maskShader = get_mask_shader();
 	maskShader.setUniform("texture", sf::Shader::CurrentTexture);
 	maskShader.setUniform("mask", mask_gworld);
 	rect_draw_some_item(src.getTexture(), dest_rect, targ_gworld, targ_rect, &maskShader, colour);
