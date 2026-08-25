@@ -24,83 +24,34 @@ jobs:
 
           path = Path("android/app/src/main/cpp/CMakeLists.txt")
           text = path.read_text()
-          old = '''    file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")
-
-    add_subdirectory("${sfml_SOURCE_DIR}" "${sfml_BINARY_DIR}")
-'''
-          new = '''    file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")
-
-    # OpenBoE is a mouse-driven desktop game. SFML's Android backend normally
-    # emits TouchBegan/TouchEnded/TouchMoved for a touchscreen, while the game
-    # listens for mouse events. Translate touchscreen input into a normal left
-    # mouse button and mouse movement at the backend so every existing clickable
-    # control (startup screen, dialogs and in-game UI) gets Android touch support.
-    set(SFML_ANDROID_WINDOW_CPP "${sfml_SOURCE_DIR}/src/SFML/Window/Android/WindowImplAndroid.cpp")
-    file(READ "${SFML_ANDROID_WINDOW_CPP}" SFML_ANDROID_WINDOW_SOURCE)
-
-    set(SFML_TOUCH_DOWN_OLD [=[            event.type = Event::TouchBegan;
-            event.touch.finger = static_cast<unsigned int>(id);
-            event.touch.x = x;
-            event.touch.y = y;
-
-            states.touchEvents[id] = Vector2i(event.touch.x, event.touch.y);]=])
-    set(SFML_TOUCH_DOWN_NEW [=[            event.type = Event::MouseButtonPressed;
-            event.mouseButton.button = Mouse::Left;
-            event.mouseButton.x = x;
-            event.mouseButton.y = y;
-
-            states.mousePosition = Vector2i(x, y);
-            states.isButtonPressed[Mouse::Left] = true;
-            states.touchEvents[id] = Vector2i(x, y);]=])
-
-    set(SFML_TOUCH_UP_OLD [=[            event.type = Event::TouchEnded;
-            event.touch.finger = static_cast<unsigned int>(id);
-            event.touch.x = x;
-            event.touch.y = y;
-
-            states.touchEvents.erase(id);]=])
-    set(SFML_TOUCH_UP_NEW [=[            event.type = Event::MouseButtonReleased;
-            event.mouseButton.button = Mouse::Left;
-            event.mouseButton.x = x;
-            event.mouseButton.y = y;
-
-            states.mousePosition = Vector2i(x, y);
-            states.isButtonPressed[Mouse::Left] = false;
-            states.touchEvents.erase(id);]=])
-
-    set(SFML_TOUCH_MOVE_OLD [=[            event.touch.finger = static_cast<unsigned int>(id);
-            event.touch.x = x;
-            event.touch.y = y;
-
-            states.touchEvents[id] = Vector2i(event.touch.x, event.touch.y);]=])
-    set(SFML_TOUCH_MOVE_NEW [=[            event.type = Event::MouseMoved;
-            event.mouseMove.x = x;
-            event.mouseMove.y = y;
-
-            states.mousePosition = Vector2i(x, y);
-            states.touchEvents[id] = Vector2i(x, y);]=])
-
-    foreach(PATCH_PAIR
-        "SFML_TOUCH_DOWN_OLD;SFML_TOUCH_DOWN_NEW"
-        "SFML_TOUCH_UP_OLD;SFML_TOUCH_UP_NEW"
-        "SFML_TOUCH_MOVE_OLD;SFML_TOUCH_MOVE_NEW")
-        list(GET PATCH_PAIR 0 OLD_VAR)
-        list(GET PATCH_PAIR 1 NEW_VAR)
-        string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${${OLD_VAR}}" PATCH_POS)
-        if(PATCH_POS EQUAL -1)
-            message(FATAL_ERROR "Expected SFML Android touch block was not found: ${OLD_VAR}")
-        endif()
-        string(REPLACE "${${OLD_VAR}}" "${${NEW_VAR}}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")
-    endforeach()
-
-    file(WRITE "${SFML_ANDROID_WINDOW_CPP}" "${SFML_ANDROID_WINDOW_SOURCE}")
-
-    add_subdirectory("${sfml_SOURCE_DIR}" "${sfml_BINARY_DIR}")
-'''
-          if old not in text:
+          marker = '    file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")\n\n    add_subdirectory("${sfml_SOURCE_DIR}" "${sfml_BINARY_DIR}")\n'
+          cmake = (
+              '    file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")\n\n'
+              '    # Android touchscreen input should behave like the desktop left mouse.\n'
+              '    # Patching SFML here makes existing OpenBoE controls work without per-screen touch code.\n'
+              '    set(SFML_ANDROID_WINDOW_CPP "${sfml_SOURCE_DIR}/src/SFML/Window/Android/WindowImplAndroid.cpp")\n'
+              '    file(READ "${SFML_ANDROID_WINDOW_CPP}" SFML_ANDROID_WINDOW_SOURCE)\n\n'
+              '    set(SFML_TOUCH_DOWN_OLD [=[            event.type = Event::TouchBegan;\n            event.touch.finger = static_cast<unsigned int>(id);\n            event.touch.x = x;\n            event.touch.y = y;\n\n            states.touchEvents[id] = Vector2i(event.touch.x, event.touch.y);]=])\n'
+              '    set(SFML_TOUCH_DOWN_NEW [=[            event.type = Event::MouseButtonPressed;\n            event.mouseButton.button = Mouse::Left;\n            event.mouseButton.x = x;\n            event.mouseButton.y = y;\n\n            states.mousePosition = Vector2i(x, y);\n            states.isButtonPressed[Mouse::Left] = true;\n            states.touchEvents[id] = Vector2i(x, y);]=])\n\n'
+              '    set(SFML_TOUCH_UP_OLD [=[            event.type = Event::TouchEnded;\n            event.touch.finger = static_cast<unsigned int>(id);\n            event.touch.x = x;\n            event.touch.y = y;\n\n            states.touchEvents.erase(id);]=])\n'
+              '    set(SFML_TOUCH_UP_NEW [=[            event.type = Event::MouseButtonReleased;\n            event.mouseButton.button = Mouse::Left;\n            event.mouseButton.x = x;\n            event.mouseButton.y = y;\n\n            states.mousePosition = Vector2i(x, y);\n            states.isButtonPressed[Mouse::Left] = false;\n            states.touchEvents.erase(id);]=])\n\n'
+              '    set(SFML_TOUCH_MOVE_OLD [=[            event.touch.finger = static_cast<unsigned int>(id);\n            event.touch.x = x;\n            event.touch.y = y;\n\n            states.touchEvents[id] = Vector2i(event.touch.x, event.touch.y);]=])\n'
+              '    set(SFML_TOUCH_MOVE_NEW [=[            event.type = Event::MouseMoved;\n            event.mouseMove.x = x;\n            event.mouseMove.y = y;\n\n            states.mousePosition = Vector2i(x, y);\n            states.touchEvents[id] = Vector2i(x, y);]=])\n\n'
+              '    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_TOUCH_DOWN_OLD}" SFML_TOUCH_DOWN_POS)\n'
+              '    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_TOUCH_UP_OLD}" SFML_TOUCH_UP_POS)\n'
+              '    string(FIND "${SFML_ANDROID_WINDOW_SOURCE}" "${SFML_TOUCH_MOVE_OLD}" SFML_TOUCH_MOVE_POS)\n'
+              '    if(SFML_TOUCH_DOWN_POS EQUAL -1 OR SFML_TOUCH_UP_POS EQUAL -1 OR SFML_TOUCH_MOVE_POS EQUAL -1)\n'
+              '        message(FATAL_ERROR "Expected SFML 2.6.2 Android touch input blocks were not found")\n'
+              '    endif()\n'
+              '    string(REPLACE "${SFML_TOUCH_DOWN_OLD}" "${SFML_TOUCH_DOWN_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")\n'
+              '    string(REPLACE "${SFML_TOUCH_UP_OLD}" "${SFML_TOUCH_UP_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")\n'
+              '    string(REPLACE "${SFML_TOUCH_MOVE_OLD}" "${SFML_TOUCH_MOVE_NEW}" SFML_ANDROID_WINDOW_SOURCE "${SFML_ANDROID_WINDOW_SOURCE}")\n'
+              '    file(WRITE "${SFML_ANDROID_WINDOW_CPP}" "${SFML_ANDROID_WINDOW_SOURCE}")\n\n'
+              '    add_subdirectory("${sfml_SOURCE_DIR}" "${sfml_BINARY_DIR}")\n'
+          )
+          if marker not in text:
               raise SystemExit("Expected SFML patch insertion point was not found")
-          path.write_text(text.replace(old, new, 1))
-
+          path.write_text(text.replace(marker, cmake, 1))
           Path(".github/workflows/patch-sfml-touch.yml").unlink()
 
       - name: Commit permanent touch support
