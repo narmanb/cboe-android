@@ -19,7 +19,7 @@ adb install -r "$APK"
 adb logcat -c
 adb shell am start -W -n "$ACTIVITY"
 
-# Require the real OpenBoE title screen, not Android's launch splash.
+# Require OpenBoE's real startup path, not Android's launch splash.
 title_ready=0
 for i in $(seq 1 35); do
   if adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
@@ -32,10 +32,15 @@ for i in $(seq 1 35); do
   sleep 1
 done
 if [[ "$title_ready" != "1" ]]; then
-  echo "Real OpenBoE title screen did not appear"
+  echo "OpenBoE startup did not reach draw_startup"
   exit 1
 fi
 
+# TUTORIAL_CENTER can be logged while the intro artwork is still on-screen.
+# Give the real title/menu frame time to replace that intro before capturing
+# the baseline used by the Home/resume comparison.
+sleep 5
+adb logcat -d -v threadtime > verify-title.log
 adb shell pidof "$PACKAGE" > verify-pid-before.txt
 test -s verify-pid-before.txt
 grep 'TUTORIAL_CENTER' verify-title.log | tail -n 5
@@ -79,7 +84,9 @@ grep -E 'STARTUP_BUTTON_CLICK|DIALOG_OPEN' verify-after-tap.log | tail -n 10
 adb exec-out screencap > verify-dialog.raw
 python3 .github/scripts/verify_android_changed.py verify-after.raw verify-dialog.raw
 
-# Prove Home/resume while the inline modal is open.
+# Prove Home/resume while the inline modal is open. Clear logcat first so
+# startup-only SFML warnings cannot be misclassified as resume failures.
+adb logcat -c
 adb shell input keyevent KEYCODE_HOME
 sleep 1
 adb shell am start -W -n "$ACTIVITY"
@@ -92,7 +99,7 @@ adb exec-out screencap > verify-dialog-after-resume.raw
 python3 .github/scripts/verify_android_resume.py verify-dialog.raw verify-dialog-after-resume.raw
 
 if grep -q "Failed to activate the window's context" verify-dialog-after-resume.log; then
-  echo "SFML context activation failure detected"
+  echo "New SFML context activation failure detected during dialog resume"
   grep "Failed to activate the window's context" verify-dialog-after-resume.log | tail -n 20
   exit 1
 fi
