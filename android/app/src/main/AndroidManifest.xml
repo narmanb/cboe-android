@@ -17,7 +17,8 @@
             android:label="@string/app_name"
             android:screenOrientation="landscape">
 
-            <meta-data android:name="android.app.lib_name" android:value="sfml-activity" />
+            <!-- Debug builds of SFML use the -d postfix for the bootstrap library. -->
+            <meta-data android:name="android.app.lib_name" android:value="sfml-activity-d" />
             <meta-data android:name="sfml.app.lib_name" android:value="cboe" />
 
             <intent-filter>
