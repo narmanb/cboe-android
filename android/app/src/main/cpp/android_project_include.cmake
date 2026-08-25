@@ -8,6 +8,13 @@
 # emulator diagnostics showed intermittent startup loss and repeated
 # "Failed to activate the window's context" messages after resume.
 
+# CMAKE_PROJECT_INCLUDE is also evaluated by nested project() calls such as
+# SFML's. Apply this wrapper only once during the top-level configuration.
+if(DEFINED CBOE_ANDROID_PROJECT_INCLUDE_APPLIED)
+    return()
+endif()
+set(CBOE_ANDROID_PROJECT_INCLUDE_APPLIED TRUE CACHE INTERNAL "OpenBoE Android project include already applied" FORCE)
+
 include("${CMAKE_CURRENT_LIST_DIR}/android_source_patches.cmake")
 
 # Add a runtime marker after android_source_patches.cmake has transformed
