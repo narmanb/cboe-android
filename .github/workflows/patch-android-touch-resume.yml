@@ -31,56 +31,32 @@ jobs:
               text = p.read_text()
               if old not in text:
                   raise SystemExit(f"Expected text not found in {path}: {old!r}")
-              text = text.replace(old, new, 1)
-              p.write_text(text)
+              p.write_text(text.replace(old, new, 1))
 
-          # OpenBoE's generic pointer helper must use the Android touch-backed
-          # pointer position rather than sf::Mouse, which has no useful position
-          # for a touchscreen-only Android device.
           replace_once(
               "src/game/boe.actions.cpp",
               "location where_curs = sf::Mouse::getPosition(mainPtr());",
               "location where_curs = get_pointer_position(mainPtr());",
           )
 
-          # The startup handler already receives the press event's pixel
-          # coordinates. Do not discard them and query a hardware mouse again.
           replace_once(
               "src/game/boe.startup.cpp",
               "bool handle_startup_press(location the_point) {\n\tthe_point = mouse_window_coords();",
               "bool handle_startup_press(location the_point) {\n\tthe_point = mainPtr().mapPixelToCoords(the_point, mainView);",
           )
 
-          # SFML Android destroys the EGL window surface on LostFocus and
-          # recreates it on GainedFocus. Reactivate the RenderWindow after that
-          # recreation so subsequent draws target the new surface.
           replace_once(
               "src/game/boe.main.cpp",
               "\t\tcase sf::Event::GainedFocus:\n\t\t\tcheck_window_moved(mainPtr(), last_window_x, last_window_y, \"MainWindow\");",
               "\t\tcase sf::Event::GainedFocus:\n#ifdef __ANDROID__\n\t\t\tmainPtr().setActive(true);\n\t\t\tmainPtr().setView(mainView);\n#endif\n\t\t\tcheck_window_moved(mainPtr(), last_window_x, last_window_y, \"MainWindow\");",
           )
-
-          # Extend the emulator smoke test to background and resume the Activity,
-          # retaining screenshots and logcat from both sides of the transition.
-          replace_once(
-              ".github/workflows/android.yml",
-              "            test -s runtime-pid.txt\n\n      - name: Upload runtime diagnostics",
-              "            test -s runtime-pid.txt\n            adb exec-out screencap -p > runtime-before-resume.png\n            adb shell input keyevent KEYCODE_HOME\n            sleep 2\n            adb shell am start -W -n org.openboe.cboe.android/android.app.NativeActivity || true\n            sleep 5\n            adb exec-out screencap -p > runtime-after-resume.png\n            adb shell pidof org.openboe.cboe.android > runtime-resume-pid.txt || true\n            adb logcat -d -v threadtime > runtime-resume-logcat.txt\n            echo \"Resume PID: $(cat runtime-resume-pid.txt 2>/dev/null || true)\"\n            grep -E -i 'OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc|EGL' runtime-resume-logcat.txt | tail -n 300 || true\n            test -s runtime-resume-pid.txt\n\n      - name: Upload runtime diagnostics",
-          )
-
-          replace_once(
-              ".github/workflows/android.yml",
-              "            runtime-pid.txt\n            android-emulator-build.log",
-              "            runtime-pid.txt\n            runtime-resume-pid.txt\n            runtime-resume-logcat.txt\n            runtime-before-resume.png\n            runtime-after-resume.png\n            android-emulator-build.log",
-          )
           PY
 
-      - name: Commit patch and remove one-shot workflow
+      - name: Commit source fixes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/patch-android-touch-resume.yml
-          git add src/game/boe.actions.cpp src/game/boe.startup.cpp src/game/boe.main.cpp .github/workflows/android.yml
+          git add src/game/boe.actions.cpp src/game/boe.startup.cpp src/game/boe.main.cpp
           git commit -m "Fix Android touch hit testing and resume surface"
           git push origin android-port
