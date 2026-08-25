@@ -47,6 +47,26 @@ if(NOT sfml_POPULATED)
     string(REPLACE "${SFML_FONT_OLD}" "${SFML_FONT_NEW}" SFML_FONT_SOURCE "${SFML_FONT_SOURCE}")
     file(WRITE "${SFML_FONT_CPP}" "${SFML_FONT_SOURCE}")
 
+    # SFML 2.6.2 GLES Texture::copyToImage uses framebuffer extension entry points
+    # before ensuring SFML has initialized those pointers. Font atlas growth reaches
+    # this readback path, so initialize extensions before the first FBO call.
+    set(SFML_TEXTURE_CPP "${sfml_SOURCE_DIR}/src/SFML/Graphics/Texture.cpp")
+    file(READ "${SFML_TEXTURE_CPP}" SFML_TEXTURE_SOURCE)
+    set(SFML_GLES_READBACK_OLD [=[#ifdef SFML_OPENGL_ES
+
+    // OpenGL ES doesn't have the glGetTexImage function]=])
+    set(SFML_GLES_READBACK_NEW [=[#ifdef SFML_OPENGL_ES
+
+    priv::ensureExtensionsInit();
+
+    // OpenGL ES doesn't have the glGetTexImage function]=])
+    string(FIND "${SFML_TEXTURE_SOURCE}" "${SFML_GLES_READBACK_OLD}" SFML_GLES_READBACK_POS)
+    if(SFML_GLES_READBACK_POS EQUAL -1)
+        message(FATAL_ERROR "Expected SFML 2.6.2 GLES Texture::copyToImage block was not found")
+    endif()
+    string(REPLACE "${SFML_GLES_READBACK_OLD}" "${SFML_GLES_READBACK_NEW}" SFML_TEXTURE_SOURCE "${SFML_TEXTURE_SOURCE}")
+    file(WRITE "${SFML_TEXTURE_CPP}" "${SFML_TEXTURE_SOURCE}")
+
     # Android touchscreen input should behave like the desktop left mouse.
     # Patching SFML here makes existing OpenBoE controls work without per-screen touch code.
     set(SFML_ANDROID_WINDOW_CPP "${sfml_SOURCE_DIR}/src/SFML/Window/Android/WindowImplAndroid.cpp")
