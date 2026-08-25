@@ -56,6 +56,30 @@ jobs:
             --output android/app/src/main/jniLibs/arm64-v8a/libopenal.so
           test -s android/app/src/main/jniLibs/arm64-v8a/libopenal.so
 
+      # The desktop build installs these folders beside the executable as
+      # data/{graphics,sounds,...}. Android assets are not normal filesystem
+      # paths, so android_main.cpp copies them into internalDataPath/data on
+      # first launch before the portable OpenBoE main function runs.
+      - name: Bundle game resources
+        shell: bash
+        run: |
+          rm -rf android/app/src/main/assets/data
+          mkdir -p \
+            android/app/src/main/assets/data/cursors \
+            android/app/src/main/assets/data/dialogs \
+            android/app/src/main/assets/data/fonts \
+            android/app/src/main/assets/data/graphics \
+            android/app/src/main/assets/data/sounds \
+            android/app/src/main/assets/data/strings \
+            android/app/src/main/assets/data/shaders
+          cp rsrc/cursors/*.gif android/app/src/main/assets/data/cursors/
+          cp rsrc/dialogs/*.xml android/app/src/main/assets/data/dialogs/
+          cp rsrc/fonts/*.ttf rsrc/fonts/*.bdf android/app/src/main/assets/data/fonts/
+          cp rsrc/graphics/*.png android/app/src/main/assets/data/graphics/
+          cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
+          cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
+          cp src/gfx/mask.frag src/gfx/mask.vert android/app/src/main/assets/data/shaders/
+
       - name: Build debug APK
         shell: bash
         run: |

@@ -27,6 +27,7 @@ FetchContent_Declare(
     URL https://github.com/SFML/SFML/archive/refs/tags/2.6.2.tar.gz
 )
 FetchContent_MakeAvailable(SFML)
+FetchContent_GetProperties(SFML SOURCE_DIR SFML_SOURCE_DIR)
 
 # Classic BoE uses Boost.Filesystem plus header-only Boost modules. Boost's
 # modular CMake build only exposes headers for modules that are explicitly
@@ -120,7 +121,15 @@ file(GLOB DIALOGXML_SOURCES CONFIGURE_DEPENDS
     "${CBOE_ROOT}/src/fileio/xml-parser/*.cpp"
 )
 
+# SFML invokes main(0, nullptr) on Android. Rename the game's desktop main and
+# provide a small Android wrapper that supplies a valid argv[0] and unpacks
+# bundled game resources to the app's private filesystem first.
+set_source_files_properties("${CBOE_ROOT}/src/game/boe.main.cpp"
+    PROPERTIES COMPILE_DEFINITIONS "main=cboe_portable_main"
+)
+
 add_library(cboe SHARED
+    "${CMAKE_CURRENT_LIST_DIR}/android_main.cpp"
     ${GAME_SOURCES}
     ${TOOLS_SOURCES}
     ${RESMGR_SOURCES}
@@ -166,6 +175,7 @@ target_include_directories(cboe PRIVATE
     "${CBOE_ROOT}/deps/Catch2/include/external"
     "${CBOE_ROOT}/deps/cppcodec"
     "${CBOE_ROOT}/deps/fmtlib/include"
+    "${SFML_SOURCE_DIR}/src"
 )
 
 target_compile_definitions(cboe PRIVATE TIXML_USE_TICPP)
