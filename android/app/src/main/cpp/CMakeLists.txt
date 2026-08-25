@@ -31,7 +31,7 @@ FetchContent_MakeAvailable(SFML)
 # Classic BoE uses Boost.Filesystem plus header-only Boost modules. Boost's
 # modular CMake build only exposes headers for modules that are explicitly
 # selected, so include every module currently used directly by the game.
-set(BOOST_INCLUDE_LIBRARIES filesystem system algorithm dynamic_bitset CACHE STRING "" FORCE)
+set(BOOST_INCLUDE_LIBRARIES filesystem system algorithm dynamic_bitset any CACHE STRING "" FORCE)
 FetchContent_Declare(
     Boost
     URL https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.xz
@@ -188,6 +188,7 @@ target_link_libraries(cboe PRIVATE
     Boost::system
     Boost::algorithm
     Boost::dynamic_bitset
+    Boost::any
     sfml-graphics
     sfml-window
     sfml-audio
