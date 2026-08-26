@@ -67,6 +67,7 @@ tasks.register("bundleStockScenarios") {
         def outputDir = new File(dataRoot, "stock-scenarios")
         outputDir.mkdirs()
 
+        def stockManifestEntries = []
         stockScenarioNames.each { scenarioName ->
             def sourceDir = new File(cboeRoot, "rsrc/scenarios/${scenarioName}")
             if (!new File(sourceDir, "header.exs").isFile()) {
@@ -80,24 +81,27 @@ tasks.register("bundleStockScenarios") {
             if (!archiveFile.isFile() || archiveFile.length() == 0) {
                 throw new GradleException("Failed to package stock scenario: ${scenarioName}")
             }
+
+            stockManifestEntries << "data/stock-scenarios/${scenarioName}.boes"
         }
 
-        // android_main.cpp stages exactly the files named by this manifest.
-        // Rewrite it after creating the .boes archives so they are copied out
-        // of the APK along with the normal fonts/graphics/dialog resources.
+        // The workflow stages the normal game-resource manifest before Gradle
+        // runs. Add the freshly-created scenario archives explicitly instead
+        // of rescanning the directory through Gradle's FileTree, which can
+        // retain a pre-task snapshot and omit files created during this task.
         def manifestFile = new File(dataRoot, "assets-manifest.txt")
-        def manifestEntries = fileTree(dataRoot).files
-            .findAll { it.isFile() && it != manifestFile }
-            .collect {
-                assetsRoot.toPath().relativize(it.toPath()).toString().replace(File.separator, "/")
-            }
-            .sort()
+        def manifestEntries = manifestFile.isFile()
+            ? manifestFile.readLines("UTF-8").findAll { !it.trim().isEmpty() }
+            : []
+        manifestEntries.removeAll { it.startsWith("data/stock-scenarios/") }
+        manifestEntries.addAll(stockManifestEntries)
+        manifestEntries = manifestEntries.unique().sort()
         manifestFile.setText(manifestEntries.join("\n") + "\n", "UTF-8")
 
-        stockScenarioNames.each { scenarioName ->
-            def expected = "data/stock-scenarios/${scenarioName}.boes"
-            if (!manifestEntries.contains(expected)) {
-                throw new GradleException("Stock scenario missing from asset manifest: ${expected}")
+        stockManifestEntries.each { expected ->
+            def archiveName = expected.substring(expected.lastIndexOf('/') + 1)
+            if (!new File(outputDir, archiveName).isFile() || !manifestEntries.contains(expected)) {
+                throw new GradleException("Stock scenario was not staged correctly: ${expected}")
             }
         }
     }
