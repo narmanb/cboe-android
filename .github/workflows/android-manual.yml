@@ -2,6 +2,12 @@ name: Android ARM64 Manual
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/android-manual.yml'
+      - '.github/android-manual-trigger.txt'
 
 jobs:
   build-android:
