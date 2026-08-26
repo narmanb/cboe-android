@@ -153,11 +153,11 @@ bool stage_assets(AAssetManager* manager, const std::string& root) {
     return copied > 0 && failed == 0;
 }
 
-// OpenBoE scans $HOME/.config/openboe/blades/Scenarios on POSIX platforms.
-// The stock scenarios are packaged in the APK as proper .boes archives, then
-// installed into that normal scenario directory on first run. Do not overwrite
-// an existing file: a player may have deliberately replaced or modified a
-// scenario with the same filename.
+// The three original/core scenarios are special-cased by OpenBoE's loader: it
+// looks for them under progDir/"Blades of Exile Scenarios" rather than the
+// normal custom-scenario directory. Android's progDir is the app's internal
+// data root, so install those three there. Busywork remains a custom scenario
+// and belongs in $HOME/.config/openboe/blades/Scenarios.
 bool install_stock_scenarios(const std::string& root) {
     static const char* const scenario_names[] = {
         "busywork",
@@ -166,15 +166,20 @@ bool install_stock_scenarios(const std::string& root) {
         "zakhazi"
     };
 
-    const std::string scenario_dir = root + "/.config/openboe/blades/Scenarios";
-    ensure_dir_recursive(scenario_dir);
+    const std::string custom_scenario_dir = root + "/.config/openboe/blades/Scenarios";
+    const std::string core_scenario_dir = root + "/Blades of Exile Scenarios";
+    ensure_dir_recursive(custom_scenario_dir);
+    ensure_dir_recursive(core_scenario_dir);
 
     int installed = 0;
     int present = 0;
     for (const char* scenario_name : scenario_names) {
-        const std::string filename = std::string(scenario_name) + ".boes";
+        const std::string name(scenario_name);
+        const std::string filename = name + ".boes";
         const std::string source_path = root + "/data/stock-scenarios/" + filename;
-        const std::string dest_path = scenario_dir + "/" + filename;
+        const bool is_core = name == "stealth" || name == "valleydy" || name == "zakhazi";
+        const std::string& dest_dir = is_core ? core_scenario_dir : custom_scenario_dir;
+        const std::string dest_path = dest_dir + "/" + filename;
 
         struct stat source_stat {};
         if (::stat(source_path.c_str(), &source_stat) != 0 || source_stat.st_size <= 0) {
