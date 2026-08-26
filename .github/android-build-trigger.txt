@@ -1,2 +1,2 @@
-Trigger an Android ARM64 build after applying the SFML 2.6.2 Font::Page in-place construction fix.
-This marker can be removed with the next substantive Android-port commit.
+Trigger Android ARM64 and emulator verification for the first landscape mobile-layout foundation.
+Includes the larger left-anchored game canvas and the Android eight-direction touch d-pad.
