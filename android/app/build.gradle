@@ -20,7 +20,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments "-DANDROID_STL=c++_shared", "-DCMAKE_PROJECT_INCLUDE=${projectDir}/src/main/cpp/android_project_include.cmake"
+                arguments "-DANDROID_STL=c++_shared", "-DCMAKE_PROJECT_INCLUDE=${projectDir}/src/main/cpp/android_project_include_v2.cmake"
                 cppFlags "-std=c++17", "-fexceptions", "-frtti"
                 targets "cboe", "sfml-activity"
             }
