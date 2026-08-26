@@ -18,6 +18,9 @@
 
 #include "prefs.hpp"
 #include "mathutil.hpp"
+#ifdef __ANDROID__
+#include "skills_traits.hpp"
+#endif
 
 sf::RenderWindow& mainPtr();
 
