@@ -82,6 +82,31 @@ bool copy_asset_file(AAssetManager* manager,
     return ok;
 }
 
+bool copy_regular_file(const std::string& source_path,
+                       const std::string& dest_path) {
+    std::ifstream in(source_path, std::ios::binary);
+    if (!in) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
+                            "Could not open staged file %s", source_path.c_str());
+        return false;
+    }
+
+    const std::size_t slash = dest_path.find_last_of('/');
+    if (slash != std::string::npos)
+        ensure_dir_recursive(dest_path.substr(0, slash));
+
+    std::ofstream out(dest_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
+                            "Could not create %s", dest_path.c_str());
+        return false;
+    }
+
+    out << in.rdbuf();
+    out.close();
+    return in.good() || in.eof() ? static_cast<bool>(out) : false;
+}
+
 // Android's directory-enumeration behavior for packaged assets can vary with
 // the way AGP packs/compresses them. The build writes an explicit list of every
 // bundled data file, so stage from that list using exact AAsset paths instead
@@ -128,6 +153,63 @@ bool stage_assets(AAssetManager* manager, const std::string& root) {
     return copied > 0 && failed == 0;
 }
 
+// OpenBoE scans $HOME/.config/openboe/blades/Scenarios on POSIX platforms.
+// The stock scenarios are packaged in the APK as proper .boes archives, then
+// installed into that normal scenario directory on first run. Do not overwrite
+// an existing file: a player may have deliberately replaced or modified a
+// scenario with the same filename.
+bool install_stock_scenarios(const std::string& root) {
+    static const char* const scenario_names[] = {
+        "busywork",
+        "stealth",
+        "valleydy",
+        "zakhazi"
+    };
+
+    const std::string scenario_dir = root + "/.config/openboe/blades/Scenarios";
+    ensure_dir_recursive(scenario_dir);
+
+    int installed = 0;
+    int present = 0;
+    for (const char* scenario_name : scenario_names) {
+        const std::string filename = std::string(scenario_name) + ".boes";
+        const std::string source_path = root + "/data/stock-scenarios/" + filename;
+        const std::string dest_path = scenario_dir + "/" + filename;
+
+        struct stat source_stat {};
+        if (::stat(source_path.c_str(), &source_stat) != 0 || source_stat.st_size <= 0) {
+            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
+                                "Bundled stock scenario missing: %s", source_path.c_str());
+            return false;
+        }
+
+        struct stat dest_stat {};
+        if (::stat(dest_path.c_str(), &dest_stat) == 0 && dest_stat.st_size > 0) {
+            ++present;
+            continue;
+        }
+
+        if (!copy_regular_file(source_path, dest_path)) {
+            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
+                                "Could not install stock scenario %s", filename.c_str());
+            return false;
+        }
+
+        struct stat installed_stat {};
+        if (::stat(dest_path.c_str(), &installed_stat) != 0 || installed_stat.st_size <= 0) {
+            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
+                                "Installed stock scenario is invalid: %s", dest_path.c_str());
+            return false;
+        }
+        ++installed;
+    }
+
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+                        "Stock scenarios ready: %d installed, %d already present",
+                        installed, present);
+    return true;
+}
+
 } // namespace
 
 // SFML's Android bootstrap deliberately calls main(0, nullptr). The desktop
@@ -156,6 +238,12 @@ int main(int, char**) {
         return 2;
     }
 
+    if (!install_stock_scenarios(root)) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
+                            "Stock scenario installation failed; refusing to start");
+        return 3;
+    }
+
     // Verify the first font that OpenBoE requests before handing control to the
     // game. This makes a packaging/staging regression explicit in logcat rather
     // than surfacing later as an uncaught ResMgr exception.
@@ -164,7 +252,7 @@ int main(int, char**) {
     if (::stat(bold_font.c_str(), &font_stat) != 0 || font_stat.st_size <= 0) {
         __android_log_print(ANDROID_LOG_ERROR, LOG_TAG,
                             "Required staged font missing: %s", bold_font.c_str());
-        return 3;
+        return 4;
     }
     __android_log_print(ANDROID_LOG_INFO, LOG_TAG,
                         "Verified staged font %s (%lld bytes)", bold_font.c_str(),

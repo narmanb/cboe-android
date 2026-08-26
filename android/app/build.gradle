@@ -46,3 +46,63 @@ android {
         }
     }
 }
+
+// The desktop build packages the four bundled scenarios as .boes files, which
+// are gzip-compressed tar archives rooted at a directory named "scenario".
+// Android's normal resource-staging step only copies the raw data files, so
+// reproduce that packaging here immediately before every APK build. Keeping it
+// in Gradle makes both ARM64 and emulator workflows use exactly the same stock
+// scenario payload without duplicating shell logic.
+def stockScenarioNames = ["busywork", "stealth", "valleydy", "zakhazi"]
+def cboeRoot = file("${projectDir}/../..")
+
+tasks.register("bundleStockScenarios") {
+    doLast {
+        def assetsRoot = file("src/main/assets")
+        def dataRoot = new File(assetsRoot, "data")
+        if (!dataRoot.isDirectory()) {
+            throw new GradleException("Android game assets must be staged before bundling stock scenarios")
+        }
+
+        def outputDir = new File(dataRoot, "stock-scenarios")
+        outputDir.mkdirs()
+
+        stockScenarioNames.each { scenarioName ->
+            def sourceDir = new File(cboeRoot, "rsrc/scenarios/${scenarioName}")
+            if (!new File(sourceDir, "header.exs").isFile()) {
+                throw new GradleException("Missing stock scenario source: ${sourceDir}")
+            }
+
+            def archiveFile = new File(outputDir, "${scenarioName}.boes")
+            ant.tar(destfile: archiveFile.absolutePath, compression: "gzip") {
+                tarfileset(dir: sourceDir.absolutePath, prefix: "scenario", excludes: "**/.*")
+            }
+            if (!archiveFile.isFile() || archiveFile.length() == 0) {
+                throw new GradleException("Failed to package stock scenario: ${scenarioName}")
+            }
+        }
+
+        // android_main.cpp stages exactly the files named by this manifest.
+        // Rewrite it after creating the .boes archives so they are copied out
+        // of the APK along with the normal fonts/graphics/dialog resources.
+        def manifestFile = new File(dataRoot, "assets-manifest.txt")
+        def manifestEntries = fileTree(dataRoot).files
+            .findAll { it.isFile() && it != manifestFile }
+            .collect {
+                assetsRoot.toPath().relativize(it.toPath()).toString().replace(File.separator, "/")
+            }
+            .sort()
+        manifestFile.setText(manifestEntries.join("\n") + "\n", "UTF-8")
+
+        stockScenarioNames.each { scenarioName ->
+            def expected = "data/stock-scenarios/${scenarioName}.boes"
+            if (!manifestEntries.contains(expected)) {
+                throw new GradleException("Stock scenario missing from asset manifest: ${expected}")
+            }
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("bundleStockScenarios")
+}
