@@ -8,12 +8,18 @@
 #include <memory>
 #include <SFML/Graphics/ConvexShape.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
+#include <SFML/Graphics/RenderTexture.hpp>
+#include <SFML/Graphics/Sprite.hpp>
 #include "game/boe.consts.hpp"
 #include "drawable_manager.hpp"
 
 extern cDrawableManager drawable_mgr;
 extern eGameMode overall_mode;
 extern sf::View mainView;
+extern sf::RenderTexture& terrain_screen_gworld();
+extern sf::RenderTexture& pc_stats_gworld();
+extern sf::RenderTexture& item_stats_gworld();
+extern sf::RenderTexture& text_area_gworld();
 
 namespace {
 sf::Vector2i android_pointer_position;
@@ -26,7 +32,21 @@ struct AndroidDpadButton {
     float angle;
 };
 
-bool android_dpad_visible() {
+struct AndroidMappedPanel {
+    sf::FloatRect screen;
+    sf::FloatRect legacy;
+};
+
+struct AndroidMobileLayout {
+    AndroidMappedPanel terrain;
+    AndroidMappedPanel stats;
+    AndroidMappedPanel inventory;
+    AndroidMappedPanel transcript;
+    sf::FloatRect info_column;
+    bool valid = false;
+};
+
+bool android_mobile_ui_visible() {
     switch(overall_mode) {
         case MODE_STARTUP:
         case MODE_TALKING:
@@ -38,10 +58,27 @@ bool android_dpad_visible() {
     }
 }
 
+bool android_dpad_visible() {
+    return android_mobile_ui_visible();
+}
+
+sf::FloatRect fit_inside(const sf::FloatRect& bounds, float source_w, float source_h) {
+    if(source_w <= 0.f || source_h <= 0.f || bounds.width <= 0.f || bounds.height <= 0.f)
+        return {};
+
+    const float scale = std::min(bounds.width / source_w, bounds.height / source_h);
+    const float width = source_w * scale;
+    const float height = source_h * scale;
+    return {
+        bounds.left + (bounds.width - width) * 0.5f,
+        bounds.top + (bounds.height - height) * 0.5f,
+        width,
+        height
+    };
+}
+
 // Android touch controls intentionally live in physical screen coordinates,
-// not OpenBoE's scaled desktop View. Build #66 drew them in the game View,
-// which let the right edge get clipped and made touch hit-testing disagree
-// with what was visible on real devices.
+// not OpenBoE's scaled desktop View.
 bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
                            sf::FloatRect* panel_rect = nullptr) {
     if(!android_dpad_visible())
@@ -52,11 +89,9 @@ bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
         return false;
 
     const float gap = 8.f;
-    const float right_padding = 54.f; // stay clear of gesture/navigation insets
+    const float right_padding = 44.f;
     const float vertical_padding = 18.f;
 
-    // Keep the pad large enough for fingers but bounded so it does not consume
-    // the entire right side on tablets/high-resolution phones.
     float button_size = static_cast<float>(window_size.y) * 0.115f;
     if(button_size > 86.f) button_size = 86.f;
     if(button_size < 58.f) button_size = 58.f;
@@ -65,8 +100,8 @@ bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
     float left = static_cast<float>(window_size.x) - right_padding - grid_size;
     float top = (static_cast<float>(window_size.y) - grid_size) / 2.f;
 
-    if(left < static_cast<float>(window_size.x) * 0.65f)
-        left = static_cast<float>(window_size.x) * 0.65f;
+    if(left < static_cast<float>(window_size.x) * 0.70f)
+        left = static_cast<float>(window_size.x) * 0.70f;
     if(top < vertical_padding)
         top = vertical_padding;
     if(top + grid_size > static_cast<float>(window_size.y) - vertical_padding)
@@ -78,8 +113,6 @@ bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
                              button_size, button_size);
     };
 
-    // Keypad numbering gives us exact one-step 8-direction movement through
-    // OpenBoE's existing keyboard action path, including combat/target modes.
     buttons = {{
         {cell(0, 0), sf::Keyboard::Numpad7, 315.f},
         {cell(0, 1), sf::Keyboard::Numpad8,   0.f},
@@ -97,6 +130,87 @@ bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
     return true;
 }
 
+bool android_mobile_layout(AndroidMobileLayout& layout) {
+    layout = {};
+    if(!android_mobile_ui_visible())
+        return false;
+
+    const sf::Vector2u size = mainPtr().getSize();
+    if(size.x < 900 || size.y < 420)
+        return false;
+
+    const float w = static_cast<float>(size.x);
+    const float h = static_cast<float>(size.y);
+    const float margin = 14.f;
+    const float gap = 12.f;
+    const float legacy_strip = 82.f; // leave the current action toolbar reachable during the transition
+
+    std::array<AndroidDpadButton, 8> dpad_buttons;
+    sf::FloatRect dpad_panel;
+    if(!android_dpad_geometry(dpad_buttons, &dpad_panel))
+        return false;
+
+    // Terrain keeps its original 279:351 proportions, but is now its own large
+    // screen-space panel rather than one quarter of the desktop interface.
+    const float terrain_h = h - margin * 2.f - legacy_strip;
+    const float terrain_w = terrain_h * (279.f / 351.f);
+    const sf::FloatRect terrain_bounds(margin, margin, terrain_w, terrain_h);
+
+    const float info_left = terrain_bounds.left + terrain_bounds.width + gap;
+    const float info_right = dpad_panel.left - gap;
+    const float info_width = info_right - info_left;
+    if(info_width < 260.f)
+        return false;
+
+    const float info_bottom = h - margin - legacy_strip;
+    const float info_height = info_bottom - margin;
+    const float stats_h = info_height * 0.24f;
+    const float inventory_h = info_height * 0.36f;
+    const float transcript_h = info_height - stats_h - inventory_h - gap * 2.f;
+
+    const sf::FloatRect stats_bounds(info_left, margin, info_width, stats_h);
+    const sf::FloatRect inventory_bounds(info_left, stats_bounds.top + stats_bounds.height + gap,
+                                         info_width, inventory_h);
+    const sf::FloatRect transcript_bounds(info_left, inventory_bounds.top + inventory_bounds.height + gap,
+                                          info_width, transcript_h);
+
+    // These are the legacy logical rectangles from boe.ui.cpp. Touches on the
+    // new panels are translated back into these coordinates so existing game
+    // interaction code remains unchanged.
+    layout.terrain = {fit_inside(terrain_bounds, 279.f, 351.f), {19.f, 7.f, 279.f, 351.f}};
+    layout.stats = {fit_inside(stats_bounds, 271.f, 116.f), {305.f, 7.f, 271.f, 116.f}};
+    layout.inventory = {fit_inside(inventory_bounds, 271.f, 144.f), {305.f, 132.f, 271.f, 144.f}};
+    layout.transcript = {fit_inside(transcript_bounds, 256.f, 138.f), {305.f, 285.f, 256.f, 138.f}};
+    layout.info_column = {info_left, margin, info_width, info_height};
+    layout.valid = true;
+    return true;
+}
+
+bool android_translate_panel_touch(int x, int y, sf::Vector2i& translated_pixel) {
+    AndroidMobileLayout layout;
+    if(!android_mobile_layout(layout))
+        return false;
+
+    const AndroidMappedPanel* panels[] = {
+        &layout.terrain, &layout.stats, &layout.inventory, &layout.transcript
+    };
+
+    for(const AndroidMappedPanel* panel : panels) {
+        if(!panel->screen.contains(static_cast<float>(x), static_cast<float>(y)))
+            continue;
+
+        const float u = (static_cast<float>(x) - panel->screen.left) / panel->screen.width;
+        const float v = (static_cast<float>(y) - panel->screen.top) / panel->screen.height;
+        const sf::Vector2f legacy_point(
+            panel->legacy.left + u * panel->legacy.width,
+            panel->legacy.top + v * panel->legacy.height
+        );
+        translated_pixel = mainPtr().mapCoordsToPixel(legacy_point, mainView);
+        return true;
+    }
+    return false;
+}
+
 bool android_dpad_key_at(int pixel_x, int pixel_y, sf::Keyboard::Key& key) {
     std::array<AndroidDpadButton, 8> buttons;
     if(!android_dpad_geometry(buttons))
@@ -111,6 +225,45 @@ bool android_dpad_key_at(int pixel_x, int pixel_y, sf::Keyboard::Key& key) {
     return false;
 }
 
+void draw_panel_texture(const sf::RenderTexture& texture, const sf::FloatRect& dest) {
+    const sf::Vector2u tex_size = texture.getTexture().getSize();
+    if(tex_size.x == 0 || tex_size.y == 0 || dest.width <= 0.f || dest.height <= 0.f)
+        return;
+
+    sf::RectangleShape frame({dest.width + 8.f, dest.height + 8.f});
+    frame.setPosition(dest.left - 4.f, dest.top - 4.f);
+    frame.setFillColor(sf::Color(12, 12, 14, 225));
+    frame.setOutlineColor(sf::Color(215, 205, 178, 180));
+    frame.setOutlineThickness(2.f);
+    mainPtr().draw(frame);
+
+    sf::Sprite sprite(texture.getTexture());
+    sprite.setPosition(dest.left, dest.top);
+    sprite.setScale(dest.width / static_cast<float>(tex_size.x),
+                    dest.height / static_cast<float>(tex_size.y));
+    mainPtr().draw(sprite);
+}
+
+class AndroidMobileShellDrawable : public iDrawable {
+public:
+    void draw() override {
+        AndroidMobileLayout layout;
+        if(!android_mobile_layout(layout))
+            return;
+
+        const sf::View previous_view = mainPtr().getView();
+        mainPtr().setView(mainPtr().getDefaultView());
+
+        // Separate the old render textures into independent Android panels.
+        draw_panel_texture(terrain_screen_gworld(), layout.terrain.screen);
+        draw_panel_texture(pc_stats_gworld(), layout.stats.screen);
+        draw_panel_texture(item_stats_gworld(), layout.inventory.screen);
+        draw_panel_texture(text_area_gworld(), layout.transcript.screen);
+
+        mainPtr().setView(previous_view);
+    }
+};
+
 class AndroidDpadDrawable : public iDrawable {
 public:
     void draw() override {
@@ -119,23 +272,21 @@ public:
         if(!android_dpad_geometry(buttons, &panel_rect))
             return;
 
-        // Draw in the default view so the geometry above is true pixel/screen
-        // geometry. Restore the game view immediately afterward.
         const sf::View previous_view = mainPtr().getView();
         mainPtr().setView(mainPtr().getDefaultView());
 
         sf::RectangleShape panel({panel_rect.width, panel_rect.height});
         panel.setPosition(panel_rect.left, panel_rect.top);
-        panel.setFillColor(sf::Color(12, 12, 16, 150));
-        panel.setOutlineColor(sf::Color(220, 220, 220, 125));
+        panel.setFillColor(sf::Color(12, 12, 16, 180));
+        panel.setOutlineColor(sf::Color(220, 220, 220, 145));
         panel.setOutlineThickness(1.f);
         mainPtr().draw(panel);
 
         for(const AndroidDpadButton& button : buttons) {
             sf::RectangleShape box({button.rect.width, button.rect.height});
             box.setPosition(button.rect.left, button.rect.top);
-            box.setFillColor(sf::Color(18, 18, 22, 205));
-            box.setOutlineColor(sf::Color(238, 238, 238, 225));
+            box.setFillColor(sf::Color(18, 18, 22, 220));
+            box.setOutlineColor(sf::Color(238, 238, 238, 230));
             box.setOutlineThickness(2.f);
             mainPtr().draw(box);
 
@@ -156,10 +307,13 @@ public:
     }
 };
 
-void ensure_android_dpad_registered() {
+void ensure_android_mobile_ui_registered() {
     static bool registered = false;
     if(registered)
         return;
+
+    auto shell = std::make_shared<AndroidMobileShellDrawable>();
+    drawable_mgr.add_drawable(UI_LAYER_DEFAULT + 70, "android-mobile-shell", shell);
 
     auto dpad = std::make_shared<AndroidDpadDrawable>();
     drawable_mgr.add_drawable(UI_LAYER_DEFAULT + 80, "android-movement-dpad", dpad);
@@ -186,12 +340,6 @@ double fallback_scale() {
     static double scale = 0;
 
 #ifdef __ANDROID__
-    // The desktop fallback is deliberately conservative because it must fit the
-    // game, editors, and large preference dialogs. Android only runs the game,
-    // so use the landscape screen much more aggressively while reserving roughly
-    // one third of the width for touch controls. OpenBoE's existing viewport
-    // math scales the 605x430 game canvas by UIScale, so this makes the old UI
-    // close to full-height without distorting its coordinate system.
     if(scale == 0) {
         const sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
         const double width_scale = (static_cast<double>(desktop.width) * 0.68) / boe_width;
@@ -202,20 +350,15 @@ double fallback_scale() {
         if(scale > 2.25) scale = 2.25;
     }
 
-    // Previous Android test builds inherited the desktop centered-layout and
-    // may also have persisted a 1x UIScale. Force the new Android foundation
-    // until the dedicated mobile layout has its own user-facing preferences.
     static bool android_layout_prepared = false;
     if(!android_layout_prepared) {
-        set_pref("DisplayMode", 1); // fullscreen, top-left anchored
-        clear_pref("UIScale");      // use the Android fallback above
+        set_pref("DisplayMode", 1);
+        clear_pref("UIScale");
         android_layout_prepared = true;
     }
     return scale;
 #endif
 
-    // Suppress the float comparison warning.
-    // We know it's safe here - we're just comparing static values.
     #ifdef __GNUC__
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wfloat-equal"
@@ -237,8 +380,6 @@ double fallback_scale() {
             }
         }
     }
-    // Hopefully no one would ever have such a small monitor to not fit the default size.
-    // But just in case:
     if(scale == 0){
         scale = 1.0;
     }
@@ -251,28 +392,19 @@ double fallback_scale() {
 
 sf::Vector2i get_pointer_position(sf::Window& win) {
 #ifdef __ANDROID__
-    ensure_android_dpad_registered();
+    ensure_android_mobile_ui_registered();
     if(android_pointer_valid)
         return android_pointer_position;
 #endif
     return sf::Mouse::getPosition(win);
 }
 
-// We use many nested event loops in this codebase. Each one of them
-// calls pollEvent() and they each need to remember to call handleModifier()
-// or else modifier keys will claim to be held forever.
-// The best solution for this is to wrap pollEvent() so that it calls
-// handleModifier for us every time.
 bool pollEvent(sf::Window& win, sf::Event& event){
 #ifdef __ANDROID__
-    ensure_android_dpad_registered();
+    ensure_android_mobile_ui_registered();
 #endif
     if(win.pollEvent(event)) {
 #ifdef __ANDROID__
-        // Treat a touchscreen as the desktop left mouse at the common event
-        // wrapper. This covers the main loop and all of OpenBoE's nested UI
-        // loops, while also remembering coordinates for code that asks for the
-        // current pointer position instead of reading coordinates from the event.
         switch(event.type) {
             case sf::Event::TouchBegan: {
                 const int x = event.touch.x;
@@ -283,12 +415,16 @@ bool pollEvent(sf::Window& win, sf::Event& event){
                     make_android_dpad_key_event(event, dpad_key);
                     break;
                 }
-                android_pointer_position = {x, y};
+
+                sf::Vector2i translated(x, y);
+                if(&win == &mainPtr())
+                    android_translate_panel_touch(x, y, translated);
+                android_pointer_position = translated;
                 android_pointer_valid = true;
                 event.type = sf::Event::MouseButtonPressed;
                 event.mouseButton.button = sf::Mouse::Left;
-                event.mouseButton.x = x;
-                event.mouseButton.y = y;
+                event.mouseButton.x = translated.x;
+                event.mouseButton.y = translated.y;
                 break;
             }
             case sf::Event::TouchEnded: {
@@ -299,12 +435,15 @@ bool pollEvent(sf::Window& win, sf::Event& event){
                 }
                 const int x = event.touch.x;
                 const int y = event.touch.y;
-                android_pointer_position = {x, y};
+                sf::Vector2i translated(x, y);
+                if(&win == &mainPtr())
+                    android_translate_panel_touch(x, y, translated);
+                android_pointer_position = translated;
                 android_pointer_valid = true;
                 event.type = sf::Event::MouseButtonReleased;
                 event.mouseButton.button = sf::Mouse::Left;
-                event.mouseButton.x = x;
-                event.mouseButton.y = y;
+                event.mouseButton.x = translated.x;
+                event.mouseButton.y = translated.y;
                 break;
             }
             case sf::Event::TouchMoved: {
@@ -314,11 +453,14 @@ bool pollEvent(sf::Window& win, sf::Event& event){
                 }
                 const int x = event.touch.x;
                 const int y = event.touch.y;
-                android_pointer_position = {x, y};
+                sf::Vector2i translated(x, y);
+                if(&win == &mainPtr())
+                    android_translate_panel_touch(x, y, translated);
+                android_pointer_position = translated;
                 android_pointer_valid = true;
                 event.type = sf::Event::MouseMoved;
-                event.mouseMove.x = x;
-                event.mouseMove.y = y;
+                event.mouseMove.x = translated.x;
+                event.mouseMove.y = translated.y;
                 break;
             }
             case sf::Event::MouseButtonPressed:
@@ -359,8 +501,6 @@ bool check_window_moved(sf::RenderWindow& win, int& winLastX, int& winLastY, std
     auto winPosition = win.getPosition();
     bool moved = false;
     if(winLastX != winPosition.x || winLastY != winPosition.y){
-        // Save the positions of main window and map window as hidden preferences
-        // (clamped to keep them fully on-screen when they appear the first time)
         if(!position_pref.empty()){
             sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
 
@@ -379,14 +519,12 @@ bool check_window_moved(sf::RenderWindow& win, int& winLastX, int& winLastY, std
 void makeFrontWindow(sf::Window& win) {
     static sf::Event evt;
     _makeFrontWindow(win);
-    // Discard GainedFocus events generated by our own meddling:
     while(pollEvent(win, evt));
 }
 
 void makeFrontWindow(sf::Window& win, sf::Window& prev) {
     static sf::Event evt;
     _makeFrontWindow(win);
-    // Discard GainedFocus and LostFocus events generated by our own meddling:
     while(pollEvent(win, evt));
     while(pollEvent(prev, evt));
 }
@@ -394,6 +532,5 @@ void makeFrontWindow(sf::Window& win, sf::Window& prev) {
 void setWindowFloating(sf::Window& win, bool floating) {
     static sf::Event evt;
     _setWindowFloating(win, floating);
-    // Discard GainedFocus and LostFocus events generated by our own meddling:
     while(pollEvent(win, evt));
 }
