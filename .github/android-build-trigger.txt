@@ -1,2 +1,3 @@
 Trigger Android ARM64 and emulator verification for the first landscape mobile-layout foundation.
 Includes the larger left-anchored game canvas and the Android eight-direction touch d-pad.
+Manual retrigger requested after GitHub Actions did not create a run for the prior push.
