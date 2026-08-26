@@ -38,30 +38,39 @@ bool android_dpad_visible() {
     }
 }
 
+// Android touch controls intentionally live in physical screen coordinates,
+// not OpenBoE's scaled desktop View. Build #66 drew them in the game View,
+// which let the right edge get clipped and made touch hit-testing disagree
+// with what was visible on real devices.
 bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
                            sf::FloatRect* panel_rect = nullptr) {
     if(!android_dpad_visible())
         return false;
 
-    const float panel_left = static_cast<float>(boe_width) + 18.f;
-    const float panel_right_padding = 18.f;
-    const float available_width = mainView.getSize().x - panel_left - panel_right_padding;
+    const sf::Vector2u window_size = mainPtr().getSize();
+    if(window_size.x < 600 || window_size.y < 320)
+        return false;
+
     const float gap = 8.f;
+    const float right_padding = 54.f; // stay clear of gesture/navigation insets
+    const float vertical_padding = 18.f;
 
-    if(available_width < 150.f)
-        return false;
-
-    float button_size = (available_width - 2.f * gap) / 3.f;
-    if(button_size > 76.f)
-        button_size = 76.f;
-    if(button_size < 42.f)
-        return false;
+    // Keep the pad large enough for fingers but bounded so it does not consume
+    // the entire right side on tablets/high-resolution phones.
+    float button_size = static_cast<float>(window_size.y) * 0.115f;
+    if(button_size > 86.f) button_size = 86.f;
+    if(button_size < 58.f) button_size = 58.f;
 
     const float grid_size = 3.f * button_size + 2.f * gap;
-    const float left = panel_left + (available_width - grid_size) / 2.f;
-    float top = (static_cast<float>(boe_height) - grid_size) / 2.f;
-    if(top < 48.f)
-        top = 48.f;
+    float left = static_cast<float>(window_size.x) - right_padding - grid_size;
+    float top = (static_cast<float>(window_size.y) - grid_size) / 2.f;
+
+    if(left < static_cast<float>(window_size.x) * 0.65f)
+        left = static_cast<float>(window_size.x) * 0.65f;
+    if(top < vertical_padding)
+        top = vertical_padding;
+    if(top + grid_size > static_cast<float>(window_size.y) - vertical_padding)
+        top = static_cast<float>(window_size.y) - vertical_padding - grid_size;
 
     auto cell = [&](int row, int col) {
         return sf::FloatRect(left + col * (button_size + gap),
@@ -93,9 +102,8 @@ bool android_dpad_key_at(int pixel_x, int pixel_y, sf::Keyboard::Key& key) {
     if(!android_dpad_geometry(buttons))
         return false;
 
-    const sf::Vector2f logical = mainPtr().mapPixelToCoords({pixel_x, pixel_y}, mainView);
     for(const AndroidDpadButton& button : buttons) {
-        if(button.rect.contains(logical.x, logical.y)) {
+        if(button.rect.contains(static_cast<float>(pixel_x), static_cast<float>(pixel_y))) {
             key = button.key;
             return true;
         }
@@ -111,18 +119,23 @@ public:
         if(!android_dpad_geometry(buttons, &panel_rect))
             return;
 
+        // Draw in the default view so the geometry above is true pixel/screen
+        // geometry. Restore the game view immediately afterward.
+        const sf::View previous_view = mainPtr().getView();
+        mainPtr().setView(mainPtr().getDefaultView());
+
         sf::RectangleShape panel({panel_rect.width, panel_rect.height});
         panel.setPosition(panel_rect.left, panel_rect.top);
-        panel.setFillColor(sf::Color(12, 12, 16, 105));
-        panel.setOutlineColor(sf::Color(220, 220, 220, 95));
+        panel.setFillColor(sf::Color(12, 12, 16, 150));
+        panel.setOutlineColor(sf::Color(220, 220, 220, 125));
         panel.setOutlineThickness(1.f);
         mainPtr().draw(panel);
 
         for(const AndroidDpadButton& button : buttons) {
             sf::RectangleShape box({button.rect.width, button.rect.height});
             box.setPosition(button.rect.left, button.rect.top);
-            box.setFillColor(sf::Color(18, 18, 22, 175));
-            box.setOutlineColor(sf::Color(238, 238, 238, 205));
+            box.setFillColor(sf::Color(18, 18, 22, 205));
+            box.setOutlineColor(sf::Color(238, 238, 238, 225));
             box.setOutlineThickness(2.f);
             mainPtr().draw(box);
 
@@ -135,9 +148,11 @@ public:
             arrow.setPosition(button.rect.left + button.rect.width / 2.f,
                               button.rect.top + button.rect.height / 2.f);
             arrow.setRotation(button.angle);
-            arrow.setFillColor(sf::Color(245, 245, 245, 235));
+            arrow.setFillColor(sf::Color(245, 245, 245, 245));
             mainPtr().draw(arrow);
         }
+
+        mainPtr().setView(previous_view);
     }
 };
 
