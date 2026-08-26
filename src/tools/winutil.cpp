@@ -5,6 +5,7 @@
 
 #ifdef __ANDROID__
 #include <array>
+#include <deque>
 #include <memory>
 #include <SFML/Graphics/ConvexShape.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
@@ -16,6 +17,7 @@
 extern cDrawableManager drawable_mgr;
 extern eGameMode overall_mode;
 extern sf::View mainView;
+extern std::deque<sf::Event> fake_event_queue;
 extern sf::RenderTexture& terrain_screen_gworld();
 extern sf::RenderTexture& pc_stats_gworld();
 extern sf::RenderTexture& item_stats_gworld();
@@ -28,7 +30,8 @@ int android_dpad_finger = -1;
 
 struct AndroidDpadButton {
     sf::FloatRect rect;
-    sf::Keyboard::Key key;
+    sf::Keyboard::Key primary;
+    sf::Keyboard::Key secondary;
     float angle;
 };
 
@@ -113,15 +116,19 @@ bool android_dpad_geometry(std::array<AndroidDpadButton, 8>& buttons,
                              button_size, button_size);
     };
 
+    // Use the same real arrow-key path as desktop movement. OpenBoE deliberately
+    // delays arrow keys for a few frames so two keys can combine into a diagonal.
+    // The previous Android pad emitted Numpad keys, which bypassed that movement
+    // system and did nothing on the physical device.
     buttons = {{
-        {cell(0, 0), sf::Keyboard::Numpad7, 315.f},
-        {cell(0, 1), sf::Keyboard::Numpad8,   0.f},
-        {cell(0, 2), sf::Keyboard::Numpad9,  45.f},
-        {cell(1, 0), sf::Keyboard::Numpad4, 270.f},
-        {cell(1, 2), sf::Keyboard::Numpad6,  90.f},
-        {cell(2, 0), sf::Keyboard::Numpad1, 225.f},
-        {cell(2, 1), sf::Keyboard::Numpad2, 180.f},
-        {cell(2, 2), sf::Keyboard::Numpad3, 135.f}
+        {cell(0, 0), sf::Keyboard::Up,   sf::Keyboard::Left,  315.f},
+        {cell(0, 1), sf::Keyboard::Up,   sf::Keyboard::Unknown, 0.f},
+        {cell(0, 2), sf::Keyboard::Up,   sf::Keyboard::Right,  45.f},
+        {cell(1, 0), sf::Keyboard::Left, sf::Keyboard::Unknown, 270.f},
+        {cell(1, 2), sf::Keyboard::Right,sf::Keyboard::Unknown,  90.f},
+        {cell(2, 0), sf::Keyboard::Down, sf::Keyboard::Left,  225.f},
+        {cell(2, 1), sf::Keyboard::Down, sf::Keyboard::Unknown, 180.f},
+        {cell(2, 2), sf::Keyboard::Down, sf::Keyboard::Right, 135.f}
     }};
 
     if(panel_rect)
@@ -139,20 +146,18 @@ bool android_mobile_layout(AndroidMobileLayout& layout) {
     if(size.x < 900 || size.y < 420)
         return false;
 
-    const float w = static_cast<float>(size.x);
     const float h = static_cast<float>(size.y);
-    const float margin = 14.f;
+    const float margin = 8.f;
     const float gap = 12.f;
-    const float legacy_strip = 82.f; // leave the current action toolbar reachable during the transition
 
     std::array<AndroidDpadButton, 8> dpad_buttons;
     sf::FloatRect dpad_panel;
     if(!android_dpad_geometry(dpad_buttons, &dpad_panel))
         return false;
 
-    // Terrain keeps its original 279:351 proportions, but is now its own large
-    // screen-space panel rather than one quarter of the desktop interface.
-    const float terrain_h = h - margin * 2.f - legacy_strip;
+    // Give the actual world essentially the full phone height while preserving
+    // the original terrain texture aspect ratio. No vertical stretching.
+    const float terrain_h = h - margin * 2.f;
     const float terrain_w = terrain_h * (279.f / 351.f);
     const sf::FloatRect terrain_bounds(margin, margin, terrain_w, terrain_h);
 
@@ -162,7 +167,7 @@ bool android_mobile_layout(AndroidMobileLayout& layout) {
     if(info_width < 260.f)
         return false;
 
-    const float info_bottom = h - margin - legacy_strip;
+    const float info_bottom = h - margin;
     const float info_height = info_bottom - margin;
     const float stats_h = info_height * 0.24f;
     const float inventory_h = info_height * 0.36f;
@@ -211,14 +216,17 @@ bool android_translate_panel_touch(int x, int y, sf::Vector2i& translated_pixel)
     return false;
 }
 
-bool android_dpad_key_at(int pixel_x, int pixel_y, sf::Keyboard::Key& key) {
+bool android_dpad_keys_at(int pixel_x, int pixel_y,
+                          sf::Keyboard::Key& primary,
+                          sf::Keyboard::Key& secondary) {
     std::array<AndroidDpadButton, 8> buttons;
     if(!android_dpad_geometry(buttons))
         return false;
 
     for(const AndroidDpadButton& button : buttons) {
         if(button.rect.contains(static_cast<float>(pixel_x), static_cast<float>(pixel_y))) {
-            key = button.key;
+            primary = button.primary;
+            secondary = button.secondary;
             return true;
         }
     }
@@ -232,7 +240,7 @@ void draw_panel_texture(const sf::RenderTexture& texture, const sf::FloatRect& d
 
     sf::RectangleShape frame({dest.width + 8.f, dest.height + 8.f});
     frame.setPosition(dest.left - 4.f, dest.top - 4.f);
-    frame.setFillColor(sf::Color(12, 12, 14, 225));
+    frame.setFillColor(sf::Color(12, 12, 14, 255));
     frame.setOutlineColor(sf::Color(215, 205, 178, 180));
     frame.setOutlineThickness(2.f);
     mainPtr().draw(frame);
@@ -254,7 +262,15 @@ public:
         const sf::View previous_view = mainPtr().getView();
         mainPtr().setView(mainPtr().getDefaultView());
 
-        // Separate the old render textures into independent Android panels.
+        // The legacy desktop composition is still drawn by the underlying game.
+        // Cover it completely before composing the independent Android panels so
+        // there are no duplicate/overlapping stats, inventory or toolbar pieces.
+        const sf::Vector2u size = mainPtr().getSize();
+        sf::RectangleShape backdrop({static_cast<float>(size.x), static_cast<float>(size.y)});
+        backdrop.setPosition(0.f, 0.f);
+        backdrop.setFillColor(sf::Color(28, 28, 30, 255));
+        mainPtr().draw(backdrop);
+
         draw_panel_texture(terrain_screen_gworld(), layout.terrain.screen);
         draw_panel_texture(pc_stats_gworld(), layout.stats.screen);
         draw_panel_texture(item_stats_gworld(), layout.inventory.screen);
@@ -320,7 +336,8 @@ void ensure_android_mobile_ui_registered() {
     registered = true;
 }
 
-void make_android_dpad_key_event(sf::Event& event, sf::Keyboard::Key key) {
+void make_android_key_event(sf::Event& event, sf::Keyboard::Key key) {
+    event = sf::Event();
     event.type = sf::Event::KeyPressed;
     event.key.code = key;
     event.key.alt = false;
@@ -409,10 +426,20 @@ bool pollEvent(sf::Window& win, sf::Event& event){
             case sf::Event::TouchBegan: {
                 const int x = event.touch.x;
                 const int y = event.touch.y;
-                sf::Keyboard::Key dpad_key;
-                if(&win == &mainPtr() && android_dpad_key_at(x, y, dpad_key)) {
+                sf::Keyboard::Key primary = sf::Keyboard::Unknown;
+                sf::Keyboard::Key secondary = sf::Keyboard::Unknown;
+                if(&win == &mainPtr() && android_dpad_keys_at(x, y, primary, secondary)) {
                     android_dpad_finger = static_cast<int>(event.touch.finger);
-                    make_android_dpad_key_event(event, dpad_key);
+                    make_android_key_event(event, primary);
+
+                    // A diagonal is represented by two real arrow presses. Queue
+                    // the second one so boe.main's existing 3-frame arrow combiner
+                    // sees both keys and produces exactly one diagonal step.
+                    if(secondary != sf::Keyboard::Unknown) {
+                        sf::Event second;
+                        make_android_key_event(second, secondary);
+                        fake_event_queue.push_back(second);
+                    }
                     break;
                 }
 
