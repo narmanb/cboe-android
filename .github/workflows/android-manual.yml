@@ -1,0 +1,95 @@
+name: Android ARM64 Manual
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout android-port
+        uses: actions/checkout@v4
+        with:
+          ref: android-port
+          fetch-depth: 0
+
+      - name: Initialize required submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init deps/TGUI deps/Catch2 deps/cppcodec deps/fmtlib
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Bundle OpenAL runtime
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/SFML/SFML/2.6.2/extlibs/libs-android/arm64-v8a/libopenal.so \
+            --output android/app/src/main/jniLibs/arm64-v8a/libopenal.so
+          test -s android/app/src/main/jniLibs/arm64-v8a/libopenal.so
+
+      - name: Bundle game resources
+        shell: bash
+        run: |
+          rm -rf android/app/src/main/assets/data
+          mkdir -p \
+            android/app/src/main/assets/data/cursors \
+            android/app/src/main/assets/data/dialogs \
+            android/app/src/main/assets/data/fonts \
+            android/app/src/main/assets/data/graphics \
+            android/app/src/main/assets/data/sounds \
+            android/app/src/main/assets/data/strings \
+            android/app/src/main/assets/data/shaders
+          cp rsrc/cursors/*.gif android/app/src/main/assets/data/cursors/
+          cp rsrc/dialogs/*.xml android/app/src/main/assets/data/dialogs/
+          cp rsrc/fonts/*.ttf android/app/src/main/assets/data/fonts/
+          find rsrc/fonts -maxdepth 1 -type f -name '*.bdf' -exec cp {} android/app/src/main/assets/data/fonts/ \;
+          cp rsrc/graphics/*.png android/app/src/main/assets/data/graphics/
+          cp rsrc/sounds/*.wav android/app/src/main/assets/data/sounds/
+          cp rsrc/strings/*.txt android/app/src/main/assets/data/strings/
+          cp src/gfx/mask.frag src/gfx/mask.vert android/app/src/main/assets/data/shaders/
+          (cd android/app/src/main/assets && find data -type f ! -name 'assets-manifest.txt' -print | sort > data/assets-manifest.txt)
+          test -s android/app/src/main/assets/data/assets-manifest.txt
+          grep -qx 'data/fonts/bold.ttf' android/app/src/main/assets/data/assets-manifest.txt
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "Building android-port commit $(git rev-parse --short HEAD)"
+          gradle -p android :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee android-build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-manual-build-log
+          path: android-build.log
+          if-no-files-found: warn
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cboe-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
