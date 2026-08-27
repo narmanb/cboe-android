@@ -8,7 +8,7 @@ set(CBOE_ANDROID_V11_ANCHORFIX_APPLIED TRUE CACHE INTERNAL "" FORCE)
 set(CBOE_ANDROID_V11_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v11.cmake")
 file(READ "${CBOE_ANDROID_V11_SCRIPT}" V11_SCRIPT_SOURCE)
 
-set(V11_BAD_REGISTER [=[set(V11_REGISTER_OLD [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
+set(V11_BAD_REGISTER [==[set(V11_REGISTER_OLD [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
     drawable_mgr.add_drawable(UI_LAYER_DEFAULT + 80, "android-movement-dpad", dpad);
     registered = true;]=])
 set(V11_REGISTER_NEW [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
@@ -16,9 +16,9 @@ set(V11_REGISTER_NEW [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
 
     auto map_overlay = std::make_shared<AndroidMapOverlayDrawable>();
     drawable_mgr.add_drawable(UI_LAYER_DEFAULT + 100, "android-map-overlay", map_overlay);
-    registered = true;]=])]=])
+    registered = true;]=])]==])
 
-set(V11_FIXED_REGISTER [=[set(V11_REGISTER_OLD [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
+set(V11_FIXED_REGISTER [==[set(V11_REGISTER_OLD [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
     drawable_mgr.add_drawable(UI_LAYER_DEFAULT + 80, "android-movement-dpad", dpad);
 
     auto quick_actions = std::make_shared<AndroidQuickActionsDrawable>();
@@ -32,7 +32,7 @@ set(V11_REGISTER_NEW [=[    auto dpad = std::make_shared<AndroidDpadDrawable>();
 
     auto map_overlay = std::make_shared<AndroidMapOverlayDrawable>();
     drawable_mgr.add_drawable(UI_LAYER_DEFAULT + 100, "android-map-overlay", map_overlay);
-    registered = true;]=])]=])
+    registered = true;]=])]==])
 
 string(FIND "${V11_SCRIPT_SOURCE}" "${V11_BAD_REGISTER}" V11_BAD_REGISTER_POS)
 if(NOT V11_BAD_REGISTER_POS EQUAL -1)
