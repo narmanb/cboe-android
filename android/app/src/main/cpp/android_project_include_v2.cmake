@@ -4,3 +4,4 @@
 include("${CMAKE_CURRENT_LIST_DIR}/android_project_include.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v3.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v4.cmake")
