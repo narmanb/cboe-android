@@ -36,6 +36,14 @@ PY
 }
 
 adb install -r "$APK"
+
+# A fresh API-35 emulator can cover the first immersive-mode frame with
+# Android's own "Viewing full screen" confirmation. If that OS overlay lands
+# in the pre-Home screenshot but disappears after resume, the framebuffer
+# comparison reports a huge false difference even though OpenBoE is healthy.
+# Mark the emulator confirmation as acknowledged before launching the app.
+adb shell settings put secure immersive_mode_confirmations confirmed >/dev/null 2>&1 || true
+
 adb logcat -c
 launch_app runtime-launch.txt
 
@@ -55,6 +63,10 @@ if [[ "$title_ready" != "1" ]]; then
   exit 1
 fi
 
+# Match the stricter verifier's initial settle period. Besides allowing SFML's
+# first landscape surface to stabilize, this keeps transient Android system UI
+# out of the baseline even on emulator images that ignore the setting above.
+sleep 5
 wait_for_landscape runtime-orientation-before.raw
 sleep 1
 adb shell pidof "$PACKAGE" > runtime-pid.txt || true
