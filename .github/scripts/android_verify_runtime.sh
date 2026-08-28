@@ -15,15 +15,17 @@ capture_failure_diagnostics() {
 trap capture_failure_diagnostics ERR
 
 launch_app() {
-  adb shell am start -W \
-    -a android.intent.action.MAIN \
+  local log_file="$1"
+  adb shell monkey \
+    -p "$PACKAGE" \
     -c android.intent.category.LAUNCHER \
-    -p "$PACKAGE"
+    1 2>&1 | tee "$log_file"
+  grep -q 'Events injected: 1' "$log_file"
 }
 
 adb install -r "$APK"
 adb logcat -c
-launch_app
+launch_app verify-launch.txt
 
 # Require OpenBoE's real startup path, not Android's launch splash.
 title_ready=0
@@ -55,7 +57,7 @@ adb exec-out screencap > verify-before.raw
 # Prove title-screen Home/resume keeps the same process and a usable frame.
 adb shell input keyevent KEYCODE_HOME
 sleep 1
-launch_app
+launch_app verify-resume-launch.txt
 sleep 3
 adb shell pidof "$PACKAGE" > verify-pid-after.txt
 test -s verify-pid-after.txt
@@ -95,7 +97,7 @@ python3 .github/scripts/verify_android_changed.py verify-after.raw verify-dialog
 adb logcat -c
 adb shell input keyevent KEYCODE_HOME
 sleep 1
-launch_app
+launch_app verify-dialog-resume-launch.txt
 sleep 3
 adb shell pidof "$PACKAGE" > verify-dialog-resume-pid.txt
 test -s verify-dialog-resume-pid.txt
