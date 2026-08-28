@@ -8,6 +8,7 @@ set(CBOE_ANDROID_CODEBERG_V28_APPLIED TRUE CACHE INTERNAL "" FORCE)
 get_filename_component(CBOE_ANDROID_V28_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../.." ABSOLUTE)
 set(V28_MAIN_CPP "${CBOE_ANDROID_V28_ROOT}/src/game/boe.main.cpp")
 set(V28_TOWN_CPP "${CBOE_ANDROID_V28_ROOT}/src/game/boe.town.cpp")
+set(V28_PARTY_CPP "${CBOE_ANDROID_V28_ROOT}/src/game/boe.party.cpp")
 set(V28_UNIVERSE_HPP "${CBOE_ANDROID_V28_ROOT}/src/universe/universe.hpp")
 set(V28_UNIVERSE_CPP "${CBOE_ANDROID_V28_ROOT}/src/universe/universe.cpp")
 
@@ -84,5 +85,17 @@ if(V28_BASH_POS EQUAL -1)
 endif()
 string(REPLACE "${V28_BASH_OLD}" "${V28_BASH_NEW}" V28_TOWN "${V28_TOWN}")
 file(WRITE "${V28_TOWN_CPP}" "${V28_TOWN}")
+
+# The Unlock spell uses the same door difficulty calculation, so it must be
+# compatibility-gated as well. This was the remaining Codeberg call site.
+file(READ "${V28_PARTY_CPP}" V28_PARTY)
+set(V28_UNLOCK_OLD [=[r1 = get_ran(1,1,100) - 5 * adj + 5 * univ.town->difficulty;]=])
+set(V28_UNLOCK_NEW [=[r1 = get_ran(1,1,100) - 5 * adj + 5 * univ.town.door_diff_adjust();]=])
+string(FIND "${V28_PARTY}" "${V28_UNLOCK_OLD}" V28_UNLOCK_POS)
+if(V28_UNLOCK_POS EQUAL -1)
+    message(FATAL_ERROR "v28: expected Unlock-spell town-difficulty expression not found")
+endif()
+string(REPLACE "${V28_UNLOCK_OLD}" "${V28_UNLOCK_NEW}" V28_PARTY "${V28_PARTY}")
+file(WRITE "${V28_PARTY_CPP}" "${V28_PARTY}")
 
 message(STATUS "Applied Codeberg door-town-difficulty compatibility feature")
