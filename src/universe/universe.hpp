@@ -142,10 +142,11 @@ public:
 class cCurOut {
 	cUniverse& univ;
 public:
-	static const int max_dim = 96;
-	static const int half_dim = max_dim / 2;
-	array2d<ter_num_t, max_dim, max_dim> out;
-	array2d<unsigned char, max_dim, max_dim> out_e;
+	static const int outd_size = 96;
+	static const int half_dim = outd_size / 2;
+	array2d<ter_num_t, outd_size, outd_size> out;
+	array2d<unsigned char, outd_size, outd_size> out_e;
+	int max_dim() const { return outd_size; }
 	
 	// These take global coords (ie 0..95)
 	bool is_spot(int x, int y) const;

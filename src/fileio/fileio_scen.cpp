@@ -2159,8 +2159,8 @@ void loadOutMapData(map_data&& data, location which, cScenario& scen) {
 
 void loadTownMapData(map_data&& data, int which, cScenario& scen) {
 	cTown& town = *scen.towns[which];
-	for(int x = 0; x < town.max_dim; x++) {
-		for(int y = 0; y < town.max_dim; y++) {
+	for(int x = 0; x < town.max_dim(); x++) {
+		for(int y = 0; y < town.max_dim(); y++) {
 			town.terrain(x,y) = data.get(x,y);
 			auto features = data.getFeatures(x,y);
 			for(auto feat : features) {

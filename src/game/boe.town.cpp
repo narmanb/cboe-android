@@ -133,8 +133,8 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 
 	univ.town.belt_present = false;
 	// Set up map, using stored map
-	for(short i = 0; i < univ.town->max_dim; i++)
-		for(short j = 0; j < univ.town->max_dim; j++) {
+	for(short i = 0; i < univ.town->max_dim(); i++)
+		for(short j = 0; j < univ.town->max_dim(); j++) {
 			if(univ.town->maps[j][i])
 				make_explored(i,j);
 			
@@ -344,8 +344,8 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 			univ.town.monst[i].active = eCreatureStatus::DEAD;
 	
 	// Set up field booleans, correct for doors
-	for(short j = 0; j < univ.town->max_dim; j++)
-		for(short k = 0; k < univ.town->max_dim; k++) {
+	for(short j = 0; j < univ.town->max_dim(); j++)
+		for(short k = 0; k < univ.town->max_dim(); k++) {
 			loc.x = j; loc.y = k;
 			if(is_door(loc)) {
 				univ.town.set_web(j,k,false);
@@ -568,8 +568,8 @@ location end_town_mode(bool switching_level,location destination, bool debug_lea
 		}
 		
 		// Now store map
-		for(short i = 0; i < univ.town->max_dim; i++)
-			for(short j = 0; j < univ.town->max_dim; j++)
+		for(short i = 0; i < univ.town->max_dim(); i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				if(is_explored(i,j)) {
 					univ.town->maps[j].set(i);
 				}
@@ -898,7 +898,7 @@ void create_out_combat_terrain(short ter_type,short num_walls,bool is_road) {
 		// We take the terrain from the specified town, and nothing else.
 		// No preset creatures, items, special nodes, etc.
 		// Furthermore, if it's a large town, we drop the outer 8 tiles.
-		size_t town_size = univ.scenario.towns[arena]->max_dim;
+		size_t town_size = univ.scenario.towns[arena]->max_dim();
 		int offset = max(0,town_size - 48);
 		rectangle town_bounds = univ.scenario.towns[arena]->in_town_rect;
 		// Just in case the town boundary is somehow larger than the town...
@@ -1337,7 +1337,7 @@ void draw_map(bool need_refresh) {
 		redraw_rect = view_rect;
 	}
 	else {
-		total_size = univ.town->max_dim;
+		total_size = univ.town->max_dim();
 		switch(total_size) {
 			case 64:
 				view_rect.left = minmax(0,24,univ.party.town_loc.x - 20);

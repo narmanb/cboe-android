@@ -43,8 +43,8 @@ void cCurTown::import_legacy(legacy::current_town_type& old){
 }
 
 void cCurTown::import_legacy(legacy::big_tr_type& old){
-	for(short i = 0; i < record()->max_dim; i++)
-		for(short j = 0; j < record()->max_dim; j++)
+	for(short i = 0; i < record()->max_dim(); i++)
+		for(short j = 0; j < record()->max_dim(); j++)
 			record()->terrain(i,j) = old.terrain[i][j];
 	record()->area_desc.resize(16);
 	for(short i = 0; i < 16; i++){
@@ -56,8 +56,8 @@ void cCurTown::import_legacy(legacy::big_tr_type& old){
 	record()->creatures.resize(60);
 	for(short i = 0; i < 60; i++)
 		record()->creatures[i].import_legacy(old.creatures[i]);
-	for(short i = 0; i < record()->max_dim; i++)
-		for(short j = 0; j < record()->max_dim; j++) {
+	for(short i = 0; i < record()->max_dim(); i++)
+		for(short j = 0; j < record()->max_dim(); j++) {
 			record()->lighting[i][j] = old.lighting[i / 8][j] & (1 << (i % 8));
 		}
 }
@@ -118,7 +118,7 @@ const cTown& cCurTown::operator * () const {
 
 void cCurTown::place_preset_fields() {
 	// Initialize barriers, etc. Note non-sfx gets forgotten if this is a town recently visited.
-	fields.resize(record()->max_dim, record()->max_dim);
+	fields.resize(record()->max_dim(), record()->max_dim());
 	fields.fill(0);
 	for(size_t i = 0; i < record()->preset_fields.size(); i++) {
 		switch(record()->preset_fields[i].type){
@@ -185,8 +185,8 @@ void cCurTown::place_preset_fields() {
 }
 
 void cCurTown::update_fields(const vector2d<unsigned short>& setup) {
-	for(short i = 0; i < record()->max_dim && i < setup.width(); i++) {
-		for(short j = 0; j < record()->max_dim && j < setup.height(); j++) {
+	for(short i = 0; i < record()->max_dim() && i < setup.width(); i++) {
+		for(short j = 0; j < record()->max_dim() && j < setup.height(); j++) {
 			// except that pushable things restore to orig locs
 			unsigned short temp = setup[i][j] << 8;
 			temp &= ~(OBJECT_CRATE | OBJECT_BARREL | OBJECT_BLOCK);
@@ -196,9 +196,9 @@ void cCurTown::update_fields(const vector2d<unsigned short>& setup) {
 }
 
 void cCurTown::save_setup(vector2d<unsigned short>& setup) const {
-	setup.resize(record()->max_dim, record()->max_dim);
-	for(short i = 0; i < record()->max_dim; i++) {
-		for(short j = 0; j < record()->max_dim; j++) {
+	setup.resize(record()->max_dim(), record()->max_dim());
+	for(short i = 0; i < record()->max_dim(); i++) {
+		for(short j = 0; j < record()->max_dim(); j++) {
 			setup[i][j] = fields[i][j] >> 8;
 		}
 	}
@@ -816,8 +816,8 @@ bool cCurTown::is_impassable(short i,short  j) const {
 
 bool cCurTown::is_on_map(short x, short y) const {
 	if(x < 0 || y < 0) return false;
-	if(x >= record()->max_dim) return false;
-	if(y >= record()->max_dim) return false;
+	if(x >= record()->max_dim()) return false;
+	if(y >= record()->max_dim()) return false;
 	return true;
 }
 
@@ -838,8 +838,8 @@ const ter_num_t& cCurOut::operator [] (location loc) const {
 }
 
 void cCurOut::writeTo(std::ostream& file) const {
-	writeArray(file, out, max_dim, max_dim);
-	writeArray(file, out_e, max_dim, max_dim);
+	writeArray(file, out, max_dim(), max_dim());
+	writeArray(file, out_e, max_dim(), max_dim());
 //	file << "OUTDOORS 0 0" << std::endl;
 //	outdoors[0][0].writeTo(file);
 //	file << "OUTDOORS 0 1" << std::endl;
@@ -852,8 +852,8 @@ void cCurOut::writeTo(std::ostream& file) const {
 }
 
 void cCurOut::readFrom(std::istream& file) {
-	readArray(file, out, max_dim, max_dim);
-	readArray(file, out_e, max_dim, max_dim);
+	readArray(file, out, max_dim(), max_dim());
+	readArray(file, out_e, max_dim(), max_dim());
 }
 
 void cCurTown::writeTo(cTagFile& file) const {
@@ -892,16 +892,16 @@ void cCurTown::readFrom(const cTagFile& file){
 		} else if(page.getFirstKey() == "FIELDS" || page.getFirstKey() == "TERRAIN") {
 			page["FIELDS"].extract(fields);
 			page["TERRAIN"].extract(record()->terrain);
-			fields.resize(record()->max_dim, record()->max_dim);
-			for(size_t x = 0; x < record()->max_dim; x++) {
-				for(size_t y = 0; y < record()->max_dim; y++) {
+			fields.resize(record()->max_dim(), record()->max_dim());
+			for(size_t x = 0; x < record()->max_dim(); x++) {
+				for(size_t y = 0; y < record()->max_dim(); y++) {
 					if(is_quickfire(x, y)) {
 						quickfire_present = true;
 					}
 				}
 			}
-			for(size_t x = 0; x < record()->max_dim; x++) {
-				for(size_t y = 0; y < record()->max_dim; y++) {
+			for(size_t x = 0; x < record()->max_dim(); x++) {
+				for(size_t y = 0; y < record()->max_dim(); y++) {
 					auto ter_num = record()->terrain(x,y);
 					const auto ter_info = univ.scenario.ter_types[ter_num];
 					if(ter_info.special == eTerSpec::CONVEYOR) {
@@ -968,8 +968,8 @@ bool cCurOut::is_road(int x, int y) const {
 
 bool cCurOut::is_on_map(int x, int y) const {
 	if(x < 0 || y < 0) return false;
-	if(x >= max_dim) return false;
-	if(y >= max_dim) return false;
+	if(x >= outd_size) return false;
+	if(y >= outd_size) return false;
 	return true;
 }
 

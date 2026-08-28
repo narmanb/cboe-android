@@ -130,8 +130,8 @@ cOutdoors::cOutdoors(cScenario& scenario) : cArea(AREA_MEDIUM), scenario(&scenar
 	bg_out = bg_fight = bg_town = bg_dungeon = -1;
 	out_sound = 0;
 	
-	for(short i = 0; i < max_dim; i++)
-		for(short j = 0; j < max_dim; j++) {
+	for(short i = 0; i < max_dim(); i++)
+		for(short j = 0; j < max_dim(); j++) {
 			terrain[i][j] = scenario.default_ground;
 			special_spot[i][j] = false;
 			roads[i][j] = false;

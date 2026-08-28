@@ -117,12 +117,12 @@ void shift_universe_left() {
 	univ.party.i_w_c.x++;
 	univ.party.out_loc.x += univ.out.half_dim;
 	
-	for(short i = univ.out.half_dim; i < univ.out.max_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+	for(short i = univ.out.half_dim; i < univ.out.max_dim(); i++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i - univ.out.half_dim][j];
 	
 	for(short i = 0; i < univ.out.half_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	
 	for(short i = 0; i < univ.party.out_c.size(); i++) {
@@ -144,10 +144,10 @@ void shift_universe_right() {
 	univ.party.i_w_c.x--;
 	univ.party.out_loc.x -= univ.out.half_dim;
 	for(short i = 0; i < univ.out.half_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i + univ.out.half_dim][j];
-	for(short i = univ.out.half_dim; i < univ.out.max_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+	for(short i = univ.out.half_dim; i < univ.out.max_dim(); i++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	
 	
@@ -169,10 +169,10 @@ void shift_universe_up() {
 	univ.party.i_w_c.y++;
 	univ.party.out_loc.y += univ.out.half_dim;
 	
-	for(short i = 0; i < univ.out.max_dim; i++)
-		for(short j = univ.out.half_dim; j < univ.out.max_dim; j++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
+		for(short j = univ.out.half_dim; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i][j - univ.out.half_dim];
-	for(short i = 0; i < univ.out.max_dim; i++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
 		for(short j = 0; j < univ.out.half_dim; j++)
 			univ.out.out_e[i][j] = 0;
 	
@@ -196,11 +196,11 @@ void shift_universe_down() {
 	univ.party.i_w_c.y--;
 	univ.party.out_loc.y = univ.party.out_loc.y - univ.out.half_dim;
 	
-	for(short i = 0; i < univ.out.max_dim; i++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
 		for(short j = 0; j < univ.out.half_dim; j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i][j + univ.out.half_dim];
-	for(short i = 0; i < univ.out.max_dim; i++)
-		for(short j = univ.out.half_dim; j < univ.out.max_dim; j++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
+		for(short j = univ.out.half_dim; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	
 	for(short i = 0; i < univ.party.out_c.size(); i++) {
@@ -236,8 +236,8 @@ void position_party(short out_x,short out_y,short pc_pos_x,short pc_pos_y) {
 	univ.party.i_w_c.y = (univ.party.out_loc.y > 47) ? 1 : 0;
 	for(short i = 0; i < univ.party.out_c.size(); i++)
 		univ.party.out_c[i].exists = false;
-	for(short i = 0; i < univ.out.max_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	build_outdoors();
 }

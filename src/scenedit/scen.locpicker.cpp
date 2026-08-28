@@ -34,8 +34,8 @@ cLocationPicker::cLocationPicker(location loc, cArea& area, const std::string& t
 }
 
 void cLocationPicker::clamp_loc() {
-	chosen_loc.x = minmax(0, area->max_dim - 1, chosen_loc.x);
-	chosen_loc.y = minmax(0, area->max_dim - 1, chosen_loc.y);
+	chosen_loc.x = minmax(0, area->max_dim() - 1, chosen_loc.x);
+	chosen_loc.y = minmax(0, area->max_dim() - 1, chosen_loc.y);
 	viewport.x = 18 * floor(chosen_loc.x / 18.0);
 	viewport.y = 18 * floor(chosen_loc.y / 18.0);
 }
@@ -57,7 +57,7 @@ void cLocationPicker::fill_terrain() {
 			location ter_loc = viewport;
 			ter_loc.x += x;
 			ter_loc.y += y;
-			if(ter_loc.x >= area->max_dim || ter_loc.y >= area->max_dim) pict.setPict(74);
+			if(ter_loc.x >= area->max_dim() || ter_loc.y >= area->max_dim()) pict.setPict(74);
 			else {
 				ter_num_t ter = area->terrain[ter_loc.x][ter_loc.y];
 				pict.setPict(scenario.ter_types[ter].map_pic);
@@ -91,19 +91,19 @@ bool cLocationPicker::handle_scroll(std::string item_hit) {
 	if(item_hit == "up") {
 		if(viewport.y > 0) viewport.y -= 9;
 	} else if(item_hit == "down") {
-		if(viewport.y < area->max_dim - 18) viewport.y += 9;
+		if(viewport.y < area->max_dim() - 18) viewport.y += 9;
 	} else if(item_hit == "left") {
 		if(viewport.x > 0) viewport.x -= 9;
 	} else if(item_hit == "right") {
-		if(viewport.x < area->max_dim - 18) viewport.x += 9;
+		if(viewport.x < area->max_dim() - 18) viewport.x += 9;
 	}
 	if(viewport.x == 0) dlog["left"].hide();
 	else dlog["left"].show();
 	if(viewport.y == 0) dlog["up"].hide();
 	else dlog["up"].show();
-	if(viewport.x >= area->max_dim - 18) dlog["right"].hide();
+	if(viewport.x >= area->max_dim() - 18) dlog["right"].hide();
 	else dlog["right"].show();
-	if(viewport.y >= area->max_dim - 18) dlog["down"].hide();
+	if(viewport.y >= area->max_dim() - 18) dlog["down"].hide();
 	else dlog["down"].show();
 	fill_terrain();
 	return true;
@@ -112,7 +112,7 @@ bool cLocationPicker::handle_scroll(std::string item_hit) {
 bool cLocationPicker::handle_select(std::string item_hit) {
 	location clickedLoc = map->getCellIdx(dlog[item_hit]);
 	location check{viewport.x + clickedLoc.x, viewport.y + clickedLoc.y};
-	if(check.x < area->max_dim && check.y < area->max_dim) {
+	if(check.x < area->max_dim() && check.y < area->max_dim()) {
 		chosen_loc = check;
 		place_pointer();
 	}

@@ -783,7 +783,7 @@ void writeTownToXml(ticpp::Printer&& data, cTown& town) {
 	static const char directions[] = {'n', 'w', 's', 'e'};
 	data.OpenElement("town");
 	data.PushAttribute("boes", scenario.format_ed_version());
-	data.PushElement("size", town.max_dim);
+	data.PushElement("size", town.max_dim());
 	data.PushElement("name", town.name);
 	for(size_t i = 0; i < town.comment.size(); i++) {
 		if(!town.comment[i].empty())
@@ -1040,8 +1040,8 @@ map_data buildOutMapData(location which, cScenario& scenario) {
 map_data buildTownMapData(size_t which, cScenario& scenario) {
 	cTown& town = *scenario.towns[which];
 	map_data terrain;
-	for(size_t x = 0; x < town.max_dim; x++) {
-		for(size_t y = 0; y < town.max_dim; y++) {
+	for(size_t x = 0; x < town.max_dim(); x++) {
+		for(size_t y = 0; y < town.max_dim(); y++) {
 			terrain.set(x, y, town.terrain(x,y));
 		}
 	}

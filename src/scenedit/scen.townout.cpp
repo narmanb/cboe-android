@@ -1824,8 +1824,8 @@ bool new_town() {
 	set_current_town(scenario.towns.size() - 1);
 	town->name = new_dlg->getControl("name").getText().substr(0,30);
 	
-	for(short i = 0; i < town->max_dim; i++)
-		for(short j = 0; j < town->max_dim; j++)
+	for(short i = 0; i < town->max_dim(); i++)
+		for(short j = 0; j < town->max_dim(); j++)
 			town->terrain(i,j) = preset;
 
 	undo_list.add(action_ptr(new aCreateDeleteTown(true, scenario.towns.back())));
@@ -2048,6 +2048,6 @@ cOutdoors* pick_import_out() {
 
 // after importing a town, the view center might be out-of-bounds
 void clamp_view_center(cTown* town) {
-	cen_x = min(cen_x, town->max_dim - 5);
-	cen_y = min(cen_y, town->max_dim - 5);
+	cen_x = min(cen_x, town->max_dim() - 5);
+	cen_y = min(cen_y, town->max_dim() - 5);
 }

@@ -1726,7 +1726,7 @@ void push_things() {
 		// Now check for walls
 		if(univ.scenario.get_feature_flag("conveyor-belts") == "V2"){
 			// Don't count the thing as blocking itself (l is a reference to its actual position!)
-			l.x += univ.town->max_dim;
+			l.x += univ.town->max_dim();
 
 			bool end_position_blocked = false;
 			for(int x = check_l.x; x < check_l.x + x_width; ++x){
@@ -3444,8 +3444,8 @@ void ifthen_spec(const runtime_state& ctx) {
 				showError("Scenario tried to check for invalid field type (1...24)");
 			} else {
 				int i = 0;
-				for(short j = spec.ex1b; j < min(spec.ex2b, univ.town->max_dim); j++)
-					for(short k = spec.ex1a; k < min(spec.ex2a, univ.town->max_dim); k++) {
+				for(short j = spec.ex1b; j < min(spec.ex2b, univ.town->max_dim()); j++)
+					for(short k = spec.ex1a; k < min(spec.ex2a, univ.town->max_dim()); k++) {
 						// If pict non-zero, exclude rectangle interior
 						if(spec.pic > 0 && i > spec.ex1b && i < spec.ex2b && j > spec.ex1a && j < spec.ex2a)
 							continue;
@@ -4584,7 +4584,7 @@ void outdoor_spec(const runtime_state& ctx){
 				showError(fmt::format("The scenario attempted to put the party in a nonexistent town: {}", town));
 				break;
 			}
-			size_t town_dim = univ.scenario.towns[town]->max_dim;
+			size_t town_dim = univ.scenario.towns[town]->max_dim();
 			l = {spec.ex2a, spec.ex2b};
 			// town entry direction. 9 means forced position
 			int i = 0;

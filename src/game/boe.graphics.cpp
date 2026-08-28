@@ -841,7 +841,7 @@ void draw_terrain(short mode) {
 		max_dim_x = min(96, 48 * univ.scenario.outdoors.width());
 		max_dim_y = min(96, 48 * univ.scenario.outdoors.height());
 	}else {
-		max_dim_x = max_dim_y = univ.town->max_dim;
+		max_dim_x = max_dim_y = univ.town->max_dim();
 	}
 
 	for(short i = 0; i < 13; i++)
@@ -890,12 +890,12 @@ void draw_terrain(short mode) {
 				// Warning - this section changes where_draw
 				if(where_draw.x < 0)
 					where_draw.x = -1;
-				if(where_draw.x > univ.town->max_dim - 1)
-					where_draw.x = univ.town->max_dim;
+				if(where_draw.x > univ.town->max_dim() - 1)
+					where_draw.x = univ.town->max_dim();
 				if(where_draw.y < 0)
 					where_draw.y = -1;
-				if(where_draw.y > univ.town->max_dim - 1)
-					where_draw.y = univ.town->max_dim;
+				if(where_draw.y > univ.town->max_dim() - 1)
+					where_draw.y = univ.town->max_dim();
 				if(can_see_light(view_loc,where_draw,sight_obscurity) < 5)
 					can_draw = 1;
 				else can_draw = 0;
@@ -1089,9 +1089,9 @@ void place_trim(short q,short r,location where,ter_num_t ter_type) {
 	else {
 		// TODO: Shouldn't we subtract one here?
 		// The outdoors case (above) does subtract 1, so one of them must be wrong...
-		if(where.x == univ.town->max_dim)
+		if(where.x == univ.town->max_dim())
 			at_right = true;
-		if(where.y == univ.town->max_dim)
+		if(where.y == univ.town->max_dim())
 			at_bot = true;
 	}
 	
@@ -1349,14 +1349,14 @@ void place_road(short q,short r,location where,bool here) {
 			rect_draw_some_item (roads_gworld, road_rects[1], terrain_screen_gworld(), to_rect);
 		}
 		
-		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim - 1))
+		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim() - 1))
 			|| extend_road_terrain(where.x + 1, where.y)) {
 			to_rect = road_dest_rects[1];
 			to_rect.offset(13 + q * 28,13 + r * 36);
 			rect_draw_some_item (roads_gworld, road_rects[0], terrain_screen_gworld(), to_rect);
 		}
 		
-		if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim - 1))
+		if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim() - 1))
 			|| extend_road_terrain(where.x, where.y + 1)) {
 			to_rect = road_dest_rects[2];
 			to_rect.offset(13 + q * 28,13 + r * 36);
@@ -1387,20 +1387,20 @@ void place_road(short q,short r,location where,bool here) {
 		else if((vertTrim == eTrimType::S && trim == eTrimType::N) || (vertTrim == eTrimType::N && trim == eTrimType::S))
 			vert = can_build_roads_on(ref);
 		
-		if(((is_out()) && (where.x < 96)) || (!(is_out()) && (where.x < univ.town->max_dim - 1)))
+		if(((is_out()) && (where.x < 96)) || (!(is_out()) && (where.x < univ.town->max_dim() - 1)))
 			ter = coord_to_ter(where.x + 1,where.y);
 		eTrimType horzTrim = univ.scenario.ter_types[ter].trim_type;
-		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim - 1))
+		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim() - 1))
 			|| connect_roads(ter))
 			horz = can_build_roads_on(ref);
 		else if((horzTrim == eTrimType::W && trim == eTrimType::E) || (horzTrim == eTrimType::E && trim == eTrimType::W))
 			horz = can_build_roads_on(ref);
 		
 		if(vert){
-			if(((is_out()) && (where.y < 96)) || (!(is_out()) && (where.y < univ.town->max_dim - 1)))
+			if(((is_out()) && (where.y < 96)) || (!(is_out()) && (where.y < univ.town->max_dim() - 1)))
 				ter = coord_to_ter(where.x,where.y + 1);
 			eTrimType vertTrim = univ.scenario.ter_types[ter].trim_type;
-			if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim - 1))
+			if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim() - 1))
 				|| connect_roads(ter))
 				vert = can_build_roads_on(ref);
 			else if((vertTrim == eTrimType::S && trim == eTrimType::N) || (vertTrim == eTrimType::N && trim == eTrimType::S))

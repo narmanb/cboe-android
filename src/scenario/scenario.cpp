@@ -377,8 +377,8 @@ bool cScenario::is_ter_used(ter_num_t ter) const {
 		}
 	}
 	for(int i = 0; i < towns.size(); i++) {
-		for(int x = 0; x < towns[i]->max_dim; x++) {
-			for(int y = 0; y < towns[i]->max_dim; y++) {
+		for(int x = 0; x < towns[i]->max_dim(); x++) {
+			for(int y = 0; y < towns[i]->max_dim(); y++) {
 				if(towns[i]->terrain(x,y) == ter)
 					return true;
 			}
