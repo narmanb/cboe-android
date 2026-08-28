@@ -26,3 +26,4 @@ include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v18_compilefix.cmake"
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v19.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v20.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v21.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v22.cmake")
