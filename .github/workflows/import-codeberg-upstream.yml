@@ -1,0 +1,26 @@
+name: Import Codeberg upstream
+
+on:
+  push:
+    branches:
+      - codeberg-import-runner
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone current Codeberg upstream and publish comparison branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --mirror https://codeberg.org/OpenBoE/oboe.git upstream.git
+          cd upstream.git
+          DEFAULT_REF="$(git symbolic-ref HEAD)"
+          DEFAULT_BRANCH="${DEFAULT_REF#refs/heads/}"
+          echo "Codeberg default branch: ${DEFAULT_BRANCH}"
+          echo "Codeberg head: $(git rev-parse HEAD)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${DEFAULT_REF}:refs/heads/codeberg-upstream"
