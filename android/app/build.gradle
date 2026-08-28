@@ -2,17 +2,37 @@ plugins {
     id "com.android.application"
 }
 
+// Development APKs use Android's public AOSP test signing identity so every CI
+// build has the same certificate without storing a private release key in this
+// public repository. This is intentionally development-only; a public release
+// should use its own private signing key.
+def stableDebugSigningFile = file("$buildDir/stable-signing/openboe-aosp-test.p12")
+// Android only requires versionCode to increase across updates. Epoch minutes
+// stay well within Android's versionCode range while increasing automatically
+// for future test builds.
+def buildVersionCode = (System.currentTimeMillis() / 60000L).toInteger()
+
 android {
     namespace "org.openboe.cboe.android"
     compileSdk 35
     ndkVersion "25.2.9519653"
 
+    signingConfigs {
+        stableDebug {
+            storeFile stableDebugSigningFile
+            storePassword "openboe-dev"
+            keyAlias "openboe-dev"
+            keyPassword "openboe-dev"
+            storeType "PKCS12"
+        }
+    }
+
     defaultConfig {
         applicationId "org.openboe.cboe.android"
         minSdk 21
         targetSdk 35
-        versionCode 1
-        versionName "0.1.0"
+        versionCode buildVersionCode
+        versionName "0.1.0-dev"
 
         ndk {
             abiFilters "arm64-v8a"
@@ -30,6 +50,7 @@ android {
     buildTypes {
         debug {
             debuggable true
+            signingConfig signingConfigs.stableDebug
         }
     }
 
@@ -44,6 +65,56 @@ android {
         jniLibs {
             useLegacyPackaging true
         }
+    }
+}
+
+// Recreate a PKCS#12 keystore from the fixed AOSP test key before Gradle's
+// signing validation runs. The AOSP test key is public by design and is suitable
+// only for these sideloaded development builds.
+tasks.register("prepareStableDebugSigning") {
+    outputs.file(stableDebugSigningFile)
+    doLast {
+        if (stableDebugSigningFile.isFile()) {
+            return
+        }
+
+        def signingDir = stableDebugSigningFile.parentFile
+        signingDir.mkdirs()
+        def pk8File = new File(signingDir, "testkey.pk8")
+        def certFile = new File(signingDir, "testkey.x509.pem")
+        def pemKeyFile = new File(signingDir, "testkey.pem")
+
+        ant.get(
+            src: "https://raw.githubusercontent.com/aosp-mirror/platform_build/master/target/product/security/testkey.pk8",
+            dest: pk8File.absolutePath
+        )
+        ant.get(
+            src: "https://raw.githubusercontent.com/aosp-mirror/platform_build/master/target/product/security/testkey.x509.pem",
+            dest: certFile.absolutePath
+        )
+
+        project.exec {
+            commandLine "openssl", "pkcs8", "-inform", "DER", "-nocrypt",
+                "-in", pk8File.absolutePath, "-out", pemKeyFile.absolutePath
+        }
+        project.exec {
+            commandLine "openssl", "pkcs12", "-export",
+                "-in", certFile.absolutePath,
+                "-inkey", pemKeyFile.absolutePath,
+                "-out", stableDebugSigningFile.absolutePath,
+                "-name", "openboe-dev",
+                "-passout", "pass:openboe-dev"
+        }
+
+        if (!stableDebugSigningFile.isFile() || stableDebugSigningFile.length() == 0) {
+            throw new GradleException("Failed to create stable Android development signing store")
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == "validateSigningDebug") {
+        task.dependsOn("prepareStableDebugSigning")
     }
 }
 
