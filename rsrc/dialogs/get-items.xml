@@ -64,18 +64,19 @@
 	<button name='up' type='regular' def-key='up' top='334' left='240'>Prev</button>
 	<button name='down' type='regular' def-key='down' top='334' left='307'>Next</button>
 
-	<!-- Large character-selection touch targets. Portraits are drawn over the right half of each button. -->
-	<button name='pc1' type='tall' def-key='1' top='379' left='16'><key/></button>
-	<button name='pc2' type='tall' def-key='2' top='379' left='82'><key/></button>
-	<button name='pc3' type='tall' def-key='3' top='379' left='148'><key/></button>
-	<button name='pc4' type='tall' def-key='4' top='379' left='214'><key/></button>
-	<button name='pc5' type='tall' def-key='5' top='379' left='280'><key/></button>
-	<button name='pc6' type='tall' def-key='6' top='379' left='346'><key/></button>
+	<!-- Large character-selection touch targets. The selected character's button stays visibly pressed. -->
+	<button name='pc1' type='tall' def-key='1' top='379' left='16'/>
+	<button name='pc2' type='tall' def-key='2' top='379' left='82'/>
+	<button name='pc3' type='tall' def-key='3' top='379' left='148'/>
+	<button name='pc4' type='tall' def-key='4' top='379' left='214'/>
+	<button name='pc5' type='tall' def-key='5' top='379' left='280'/>
+	<button name='pc6' type='tall' def-key='6' top='379' left='346'/>
 
-	<pict name='pc1-g' type='pc' num='0' top='383' left='49'/>
-	<pict name='pc2-g' type='pc' num='0' top='383' left='115'/>
-	<pict name='pc3-g' type='pc' num='0' top='383' left='181'/>
-	<pict name='pc4-g' type='pc' num='0' top='383' left='247'/>
-	<pict name='pc5-g' type='pc' num='0' top='383' left='313'/>
-	<pict name='pc6-g' type='pc' num='0' top='383' left='379'/>
+	<!-- Portraits are centered in their 63x40 buttons; keyboard numbers are intentionally not drawn. -->
+	<pict name='pc1-g' type='pc' num='0' top='383' left='33'/>
+	<pict name='pc2-g' type='pc' num='0' top='383' left='99'/>
+	<pict name='pc3-g' type='pc' num='0' top='383' left='165'/>
+	<pict name='pc4-g' type='pc' num='0' top='383' left='231'/>
+	<pict name='pc5-g' type='pc' num='0' top='383' left='297'/>
+	<pict name='pc6-g' type='pc' num='0' top='383' left='363'/>
 </dialog>
