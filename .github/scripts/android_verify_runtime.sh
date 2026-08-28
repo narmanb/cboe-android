@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PACKAGE="org.openboe.cboe.android"
+ACTIVITY="org.openboe.cboe.android/.OpenBoEActivity"
 APK="android/app/build/outputs/apk/debug/app-debug.apk"
 
 capture_failure_diagnostics() {
@@ -16,11 +17,8 @@ trap capture_failure_diagnostics ERR
 
 launch_app() {
   local log_file="$1"
-  adb shell monkey \
-    -p "$PACKAGE" \
-    -c android.intent.category.LAUNCHER \
-    1 2>&1 | tee "$log_file"
-  grep -q 'Events injected: 1' "$log_file"
+  adb shell am start -W -n "$ACTIVITY" 2>&1 | tee "$log_file"
+  grep -q 'Status: ok' "$log_file"
 }
 
 adb install -r "$APK"
