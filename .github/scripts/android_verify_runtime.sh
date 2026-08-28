@@ -17,8 +17,30 @@ trap capture_failure_diagnostics ERR
 
 launch_app() {
   local log_file="$1"
+  local launch_status=0
+
+  # API-35 emulators occasionally return `Status: timeout` from `am start -W`
+  # even though the Activity process has already been created and continues
+  # starting normally. Do not let that shell status bypass the real verifier:
+  # the title-marker, PID, framebuffer, touch and dialog checks below remain
+  # authoritative. A launch with neither Status:ok nor a live process still
+  # fails immediately.
+  set +e
   adb shell am start -W -n "$ACTIVITY" 2>&1 | tee "$log_file"
-  grep -q 'Status: ok' "$log_file"
+  launch_status=${PIPESTATUS[0]}
+  set -e
+
+  if grep -q 'Status: ok' "$log_file"; then
+    return 0
+  fi
+
+  if adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
+    echo "am start -W returned status ${launch_status}, but OpenBoE is alive; continuing to strict runtime assertions"
+    return 0
+  fi
+
+  echo "OpenBoE launch failed before a live app process appeared"
+  return 1
 }
 
 # sensorLandscape can briefly expose a portrait-sized surface just after
