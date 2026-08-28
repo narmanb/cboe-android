@@ -14,12 +14,16 @@ capture_failure_diagnostics() {
 }
 trap capture_failure_diagnostics ERR
 
+launch_app() {
+  adb shell am start -W \
+    -a android.intent.action.MAIN \
+    -c android.intent.category.LAUNCHER \
+    -p "$PACKAGE"
+}
+
 adb install -r "$APK"
 adb logcat -c
-ACTIVITY=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE" | tail -n 1 | tr -d '\r')
-test -n "$ACTIVITY"
-echo "Resolved launcher: $ACTIVITY"
-adb shell am start -W -n "$ACTIVITY"
+launch_app
 
 # Require OpenBoE's real startup path, not Android's launch splash.
 title_ready=0
@@ -51,7 +55,7 @@ adb exec-out screencap > verify-before.raw
 # Prove title-screen Home/resume keeps the same process and a usable frame.
 adb shell input keyevent KEYCODE_HOME
 sleep 1
-adb shell am start -W -n "$ACTIVITY"
+launch_app
 sleep 3
 adb shell pidof "$PACKAGE" > verify-pid-after.txt
 test -s verify-pid-after.txt
@@ -91,7 +95,7 @@ python3 .github/scripts/verify_android_changed.py verify-after.raw verify-dialog
 adb logcat -c
 adb shell input keyevent KEYCODE_HOME
 sleep 1
-adb shell am start -W -n "$ACTIVITY"
+launch_app
 sleep 3
 adb shell pidof "$PACKAGE" > verify-dialog-resume-pid.txt
 test -s verify-dialog-resume-pid.txt
