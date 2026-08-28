@@ -40,7 +40,7 @@ area = replace_once(
     "\t\tstd::string str = name;\n"
     "\t\tfor(info_rect_t rect : area_desc){\n"
     "\t\t\tif(!rect.empty() && rect.contains(where)){\n"
-    "\t\t\t\tstr += \": \\" + rect.descr;\n"
+    "\t\t\t\tstr += \": \" + rect.descr;\n"
     "\t\t\t\tbreak;\n"
     "\t\t\t}\n"
     "\t\t}\n"
