@@ -196,14 +196,12 @@ jobs:
           disable-animations: true
           script: |
             set -e
+            PACKAGE=org.openboe.cboe.android
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
-            ACTIVITY=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER org.openboe.cboe.android | tail -n 1 | tr -d '\r')
-            test -n "$ACTIVITY"
-            echo "Resolved launcher: $ACTIVITY"
-            adb shell am start -W -n "$ACTIVITY"
+            adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$PACKAGE"
             sleep 8
-            adb shell pidof org.openboe.cboe.android > runtime-pid.txt || true
+            adb shell pidof "$PACKAGE" > runtime-pid.txt || true
             test -s runtime-pid.txt
             adb logcat -d -v threadtime > runtime-logcat.txt
             adb exec-out screencap -p > runtime-before-resume.png
@@ -212,9 +210,9 @@ jobs:
             grep -E -i 'OpenBoEAndroid|OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc' runtime-logcat.txt | tail -n 300 || true
             adb shell input keyevent KEYCODE_HOME
             sleep 2
-            adb shell am start -W -n "$ACTIVITY"
+            adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$PACKAGE"
             sleep 5
-            adb shell pidof org.openboe.cboe.android > runtime-resume-pid.txt || true
+            adb shell pidof "$PACKAGE" > runtime-resume-pid.txt || true
             test -s runtime-resume-pid.txt
             adb exec-out screencap -p > runtime-after-resume.png
             adb exec-out screencap > runtime-after-resume.raw
