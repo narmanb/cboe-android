@@ -6,7 +6,7 @@ need clarifications, visit the IRC channel or post on the Blades of Exile forum.
 Filing Tickets
 ==============
 
-When opening bug reports on the GitHub issue tracker, make sure to explicitly state the
+When opening bug reports on the Codeberg issue tracker, make sure to explicitly state the
 platform you are running on (Windows, OSX, or WINE). Give a concise description of the
 behaviour you expected and contrast it with the behaviour you observed. If the bug
 involves a crash, post the error message if one was shown before crashing. If there was
@@ -25,8 +25,8 @@ Contributing Code
 =================
 
 The preferred method of contributing code to Blades of Exile is to fork the repository
-on GitHub, implement your changes, and make a pull request. However, if you can't
-or won't obtain a GitHub account, email-style patches may also be acceptable.
+on Codeberg, implement your changes, and make a pull request. However, if you can't
+or won't obtain a Codeberg account, email-style patches may also be acceptable.
 
 When submitting patches, there are some things to keep in mind:
 

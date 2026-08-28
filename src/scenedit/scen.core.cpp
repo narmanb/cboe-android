@@ -198,7 +198,7 @@ bool check_range_msg(cDialog& me,std::string id,bool losing,long min_val,long ma
 		// provides context on fixing the problem.
 		sout << fld_name << " currently has no range of acceptable values";
 		if(xtra.empty()){
-			xtra = "You can open an issue on GitHub asking for help and a better error message.";
+			xtra = "You can open an issue on Codeberg asking for help and a better error message.";
 		}
 	}else{
 		sout << fld_name << " must be from " << min_val << " to " << max_val;
@@ -1897,6 +1897,7 @@ static bool edit_item_type_event_filter(cDialog& me, std::string hit, cItem& ite
 	}
 
 	if(commit_changes){
+		temp_item = item;
 		// We actually can't make the action undoable while the dialog is still open
 		if(is_new){
 			undo_list.add(action_ptr(new aCreateDeleteItem(true, temp_item)));
@@ -3344,6 +3345,8 @@ bool build_scenario() {
 	scenario.feature_flags = {
 		{"scenario-meta-format", "V2"},
 		{"resurrection-balm", "required"},
+		// Town difficulty, due to a bug, used to not be added to door difficulty
+		{"door-town-difficulty", "fixed"}
 	};
 
 	fs::path basePath = progDir/"Blades of Exile Base"/(grass ? "bladbase.boes" : "cavebase.boes");

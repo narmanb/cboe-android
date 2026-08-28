@@ -10,7 +10,7 @@
 	url = https://github.com/tplgy/cppcodec
 [submodule "deps/fix-rpaths"]
 	path = deps/fix-rpaths
-	url = https://gist.github.com/NQNStudios/7145bcf6621891f5176c8caa165d6b93
+	url = https://codeberg.org/NQNStudios/fix-rpaths
 [submodule "deps/fmtlib"]
 	path = deps/fmtlib
 	url = http://github.com/fmtlib/fmt

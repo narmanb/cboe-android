@@ -130,8 +130,8 @@ cOutdoors::cOutdoors(cScenario& scenario) : cArea(AREA_MEDIUM), scenario(&scenar
 	bg_out = bg_fight = bg_town = bg_dungeon = -1;
 	out_sound = 0;
 	
-	for(short i = 0; i < max_dim; i++)
-		for(short j = 0; j < max_dim; j++) {
+	for(short i = 0; i < max_dim(); i++)
+		for(short j = 0; j < max_dim(); j++) {
 			terrain[i][j] = scenario.default_ground;
 			special_spot[i][j] = false;
 			roads[i][j] = false;
@@ -160,7 +160,7 @@ void cOutdoors::cWandering::import_legacy(legacy::out_wandering_type old){
 
 void cOutdoors::cCreature::import_legacy(legacy::outdoor_creature_type old){
 	exists = old.exists;
-	direction = old.direction;
+	direction = eDirection(old.direction);
 	what_monst.import_legacy(old.what_monst);
 	which_sector.x = old.which_sector.x;
 	which_sector.y = old.which_sector.y;

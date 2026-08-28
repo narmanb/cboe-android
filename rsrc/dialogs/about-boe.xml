@@ -18,11 +18,11 @@
 		<!-- The height of this text needs to be 10 times the number of lines. -->
 		<text top='52' left='50' width='400' height='240'>
 			ORIGINAL GAME: <br/><br/><br/><br/><br/><br/>
-			OPEN SOURCE CREDITS: <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+			OPEN SOURCE CREDITS: <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 			SCENARIO FIXES AND UPDATES: <br/><br/>
 		</text>
 		<!-- This text is right-aligned and fills out the above text with sub-headings -->
-		<text top='52' left='40' width='190' height='840' align='right'>
+		<text top='52' left='40' width='190' height='860' align='right'>
 			<br/>
 			Concept, Design, Programming: <br/>
 			Graphics: <br/>
@@ -34,11 +34,11 @@
 			Graphics: <br/><br/><br/><br/><br/><br/><br/>
 			Consulting: <br/><br/><br/><br/>
 			Testing and Troubleshooting: <br/><br/>
-			Funding: <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+			Funding: <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 			<br/><br/>
 			Bandit Busywork: <br/>
 		</text>
-		<text top='52' left='250' width='230' height='840'>
+		<text top='52' left='250' width='230' height='860'>
 			<!-- ORIGINAL GAME --><br/>
 			<!-- Concept, Design, Programming -->Jeff Vogel <br/>
 			<!-- Graphics -->Andrew Hunter <br/>
@@ -84,6 +84,7 @@
 							Bret Rodabaugh <br/>
 							Dylan Nugent <br/>
 							Evan Mulrooney <br/>
+							Glen Chudley <br/>
 							Jake Harrelson <br/>
 							Jared Forcinito <br/>
 							Jeff Potter <br/>
@@ -99,6 +100,7 @@
 							K L <br/>
 							Laura Nelson <br/>
 							Mariann Krizsan <br/>
+							Maryanne Wachter <br/>
 							Mike Lapinsky <br/>
 							Nathan Rickey <br/>
 							Nick Chaimov <br/>
@@ -135,14 +137,14 @@
 		It is released under GNU GPL 2.0+. The source code can be found here:
 	</text>
 	<text name=	'src' relative='pos-in pos' rel-anchor='prev' top='10' left='16' colour='link' underline='true'>
-		https://github.com/calref/cboe/
+		https://codeberg.org/OpenBoE/oboe/
 	</text>
 	<text relative='neg pos' rel-anchor='prev' top='0' left='16' width='353'>
 		Comments and questions? The maintainers of Open Blades of Exile want to hear them.<br/>
 		Open a ticket here:
 	</text>
 	<text name=	'issues' relative='pos-in pos' rel-anchor='prev' top='0' left='16' colour='link' underline='true'>
-		https://github.com/calref/cboe/issues
+		https://codeberg.org/OpenBoE/oboe/issues
 	</text>
 	<button name='okay' relative='neg' type='regular' top='30' left='70'>OK</button>
 </dialog>

@@ -69,6 +69,8 @@ void force_town_enter(short which_town,location where_start) {
 	town_force_loc = where_start;
 }
 
+bool need_enter_town_autosave = false;
+
 //short entry_dir; // if 9, go to forced
 void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 	short town_number;
@@ -133,8 +135,8 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 
 	univ.town.belt_present = false;
 	// Set up map, using stored map
-	for(short i = 0; i < univ.town->max_dim; i++)
-		for(short j = 0; j < univ.town->max_dim; j++) {
+	for(short i = 0; i < univ.town->max_dim(); i++)
+		for(short j = 0; j < univ.town->max_dim(); j++) {
 			if(univ.town->maps[j][i])
 				make_explored(i,j);
 			
@@ -334,8 +336,9 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 			if(no_thrash.count(&monst) == 0)
 				monst.active = eCreatureStatus::DEAD;
 	}
+	bool specials_queued = false;
 	if(!debug_enter)
-		handle_town_specials(town_number, (short) town_toast,(entry_dir < 9) ? univ.town->start_locs[entry_dir] : town_force_loc);
+		specials_queued = handle_town_specials(town_number, (short) town_toast,(entry_dir < 9) ? univ.town->start_locs[entry_dir] : town_force_loc);
 	
 	// Flush excess doomguards and viscous goos
 	for(short i = 0; i < univ.town.monst.size(); i++)
@@ -344,8 +347,8 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 			univ.town.monst[i].active = eCreatureStatus::DEAD;
 	
 	// Set up field booleans, correct for doors
-	for(short j = 0; j < univ.town->max_dim; j++)
-		for(short k = 0; k < univ.town->max_dim; k++) {
+	for(short j = 0; j < univ.town->max_dim(); j++)
+		for(short k = 0; k < univ.town->max_dim(); k++) {
 			loc.x = j; loc.y = k;
 			if(is_door(loc)) {
 				univ.town.set_web(j,k,false);
@@ -492,24 +495,6 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 		monst.targ_loc.y = 0;
 	}
 	
-	// check horses
-	for(short i = 0; i < univ.party.boats.size(); i++) {
-		if(univ.scenario.boats[i].which_town >= 0 && univ.scenario.boats[i].loc.x >= 0) {
-			if(!univ.party.boats[i].exists) {
-				univ.party.boats[i] = univ.scenario.boats[i];
-				univ.party.boats[i].exists = true;
-			}
-		}
-	}
-	for(short i = 0; i < univ.party.horses.size(); i++) {
-		if(univ.scenario.horses[i].which_town >= 0 && univ.scenario.horses[i].loc.x >= 0) {
-			if(!univ.party.horses[i].exists) {
-				univ.party.horses[i] = univ.scenario.horses[i];
-				univ.party.horses[i].exists = true;
-			}
-		}
-	}
-	
 	clear_map();
 	reset_item_max();
 	town_force = 200;
@@ -517,7 +502,9 @@ void start_town_mode(short which_town, short entry_dir, bool debug_enter) {
 	// ... except it actually doesn't, because the town enter special is only queued, not run immediately.
 	draw_terrain(1);
 
-	try_auto_save("EnterTown");
+	// If special nodes still need to be called, we can't do the autosave yet.
+	if(specials_queued) need_enter_town_autosave = true;
+	else try_auto_save("EnterTown");
 }
 
 
@@ -568,8 +555,8 @@ location end_town_mode(bool switching_level,location destination, bool debug_lea
 		}
 		
 		// Now store map
-		for(short i = 0; i < univ.town->max_dim; i++)
-			for(short j = 0; j < univ.town->max_dim; j++)
+		for(short i = 0; i < univ.town->max_dim(); i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				if(is_explored(i,j)) {
 					univ.town->maps[j].set(i);
 				}
@@ -644,8 +631,8 @@ location end_town_mode(bool switching_level,location destination, bool debug_lea
 	return to_return;
 }
 
-void handle_town_specials(short /*town_number*/, bool town_dead,location /*start_loc*/) {
-	queue_special(eSpecCtx::ENTER_TOWN, eSpecCtxType::TOWN, town_dead ? univ.town->spec_on_entry_if_dead : univ.town->spec_on_entry, univ.party.town_loc);
+bool handle_town_specials(short /*town_number*/, bool town_dead,location /*start_loc*/) {
+	return queue_special(eSpecCtx::ENTER_TOWN, eSpecCtxType::TOWN, town_dead ? univ.town->spec_on_entry_if_dead : univ.town->spec_on_entry, univ.party.town_loc);
 }
 
 void handle_leave_town_specials(short /*town_number*/, short which_spec,location /*start_loc*/) {
@@ -812,9 +799,9 @@ void create_out_combat_terrain(short ter_type,short num_walls,bool is_road) {
 		2,2, 2, 0, 0,    36,0,2, 0,2,
 	};
 	static const location special_ter_locs[15] = {
-		loc(11,10),loc(11,14),loc(10,20),loc(11,26),loc(9,30),
-		loc(15,19),loc(23,19),loc(19,29),loc(20,11),loc(28,16),
-		loc(28,24),loc(27,19),loc(27,29),loc(15,28),loc(19,19),
+		loc(2,1),loc(2,5),loc(1,11),loc(2,17),loc(0,21),
+		loc(6,10),loc(14,10),loc(10,20),loc(11,2),loc(19,7),
+		loc(19,15),loc(18,10),loc(18,20),loc(6,19),loc(10,10),
 	};
 	static const ter_num_t cave_pillar[4][4] = {
 		{0 ,14,11,1 },
@@ -897,21 +884,23 @@ void create_out_combat_terrain(short ter_type,short num_walls,bool is_road) {
 		arena -= 1000;
 		// We take the terrain from the specified town, and nothing else.
 		// No preset creatures, items, special nodes, etc.
-		// Furthermore, if it's a large town, we drop the outer 8 tiles.
-		size_t town_size = univ.scenario.towns[arena]->max_dim;
-		int offset = max(0,town_size - 48);
+		// Furthermore, if it's a large or medium town, we drop the outer ring of tiles.
+		size_t town_size = univ.scenario.towns[arena]->max_dim();
+		int offset = max(0,town_size - univ.town->max_dim());
 		rectangle town_bounds = univ.scenario.towns[arena]->in_town_rect;
 		// Just in case the town boundary is somehow larger than the town...
 		town_bounds.left = minmax(0,town_size - 1, town_bounds.left);
 		town_bounds.right = minmax(0,town_size - 1, town_bounds.right);
 		town_bounds.top = minmax(0,town_size - 1, town_bounds.top);
 		town_bounds.bottom = minmax(0,town_size - 1, town_bounds.bottom);
-		for(short i = 0; i < 48; i++)
-			for(short j = 0; j < 48; j++) {
+		for(short i = 0; i < univ.town->max_dim(); i++)
+			for(short j = 0; j < univ.town->max_dim(); j++) {
 				// This test also accounts for small towns since the town boundary is never larger than the town
-				if(town_bounds.contains(i + offset, j + offset))
-					univ.town->terrain(i,j) = univ.scenario.towns[arena]->terrain(i + offset,j + offset);
-				else univ.town->terrain(i,j) = 90;
+				if(town_bounds.contains(i + offset, j + offset)) {
+					int x = i - town_bounds.left;
+					int y = j - town_bounds.top;
+					univ.town->terrain(x,y) = univ.scenario.towns[arena]->terrain(i + offset,j + offset);
+				}
 			}
 		// The game uses the upper left corner to replace spaces that are blocked, so it needs to be set to something sensible.
 		// We'll take the terrain at the first entry location.
@@ -921,16 +910,14 @@ void create_out_combat_terrain(short ter_type,short num_walls,bool is_road) {
 		return;
 	}
 	
-	for(short i = 0; i < 48; i++)
-		for(short j = 0; j < 48; j++) {
-			if((j <= 8) || (j >= 35) || (i <= 8) || (i >= 35))
-				univ.town->terrain(i,j) = 90;
-			else univ.town->terrain(i,j) = ter_base[arena];
+	for(short i = 0; i < univ.town->max_dim(); i++)
+		for(short j = 0; j < univ.town->max_dim(); j++) {
+			univ.town->terrain(i,j) = ter_base[arena];
 		}
-	for(short i = 0; i < 48; i++)
-		for(short j = 0; j < 48; j++)
+	for(short i = 0; i < univ.town->max_dim(); i++)
+		for(short j = 0; j < univ.town->max_dim(); j++)
 			for(short k = 0; k < 5; k++)
-				if((univ.town->terrain(i,j) != 90) && (get_ran(1,1,1000) < terrain_odds[arena][k * 2 + 1]))
+				if((get_ran(1,1,1000) < terrain_odds[arena][k * 2 + 1]))
 					univ.town->terrain(i,j) = terrain_odds[arena][k * 2];
 	
 	univ.town->terrain(0,0) = ter_base[arena];
@@ -939,32 +926,32 @@ void create_out_combat_terrain(short ter_type,short num_walls,bool is_road) {
 	
 	if(arena == 3 || (is_road && surface_arenas.count(arena))) {
 		univ.town->terrain(0,0) = 83;
-		for(short i = (is_bridge ? 15 : 19); i < (is_bridge ? 26 : 23); i++)
-			for(short j = 9; j < 35; j++)
+		for(short i = (is_bridge ? 6 : 10); i < (is_bridge ? 17 : 14); i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				univ.town->terrain(i,j) = 83;
 	}
 	if(arena == 4 || (is_road && cave_arenas.count(arena))) {
 		univ.town->terrain(0,0) = 82;
-		for(short i = (is_bridge ? 15 : 19); i < (is_bridge ? 26 : 23); i++)
-			for(short j = 9; j < 35; j++)
+		for(short i = (is_bridge ? 6 : 10); i < (is_bridge ? 17 : 14); i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				univ.town->terrain(i,j) = 82;
 	}
 	if(arena == 18 || arena == 19) {
-		for(short i = 12; i < 15; i++)
-			for(short j = 9; j < 35; j++)
-				if(j != 17 && j != 26)
+		for(short i = 3; i < 6; i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
+				if(j != 8 && j != 17)
 					univ.town->terrain(i,j) = ter_type;
-		for(short i = 17; i < 20; i++)
-			for(short j = 9; j < 35; j++)
-				if(j != 17 && j != 26)
+		for(short i = 8; i < 11; i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
+				if(j != 8 && j != 17)
 					univ.town->terrain(i,j) = ter_type;
-		for(short i = 22; i < 25; i++)
-			for(short j = 9; j < 35; j++)
-				if(j != 17 && j != 26)
+		for(short i = 13; i < 16; i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
+				if(j != 8 && j != 17)
 					univ.town->terrain(i,j) = ter_type;
-		for(short i = 27; i < 30; i++)
-			for(short j = 9; j < 35; j++)
-				if(j != 17 && j != 26)
+		for(short i = 18; i < 21; i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
+				if(j != 8 && j != 17)
 					univ.town->terrain(i,j) = ter_type;
 	}
 	if(arena == 14 || arena == 15)
@@ -1021,74 +1008,74 @@ void create_out_combat_terrain(short ter_type,short num_walls,bool is_road) {
 						univ.town->terrain(stuff_ul.x + j,stuff_ul.y + k) = surf_fume[k][j];
 			}
 	if(arena == 16) {
-		stuff_ul = loc(18,14);
+		stuff_ul = loc(9,5);
 		for(short j = 0; j < 4; j++)
 			for(short k = 0; k < 4; k++)
 				univ.town->terrain(stuff_ul.x + j,stuff_ul.y + k) = cave_camp[k][j];
 	}
 	if(arena == 17) {
-		stuff_ul = loc(18,14);
+		stuff_ul = loc(9,5);
 		for(short j = 0; j < 4; j++)
 			for(short k = 0; k < 4; k++)
 				univ.town->terrain(stuff_ul.x + j,stuff_ul.y + k) = surf_camp[k][j];
 	}
 	
 	
-	if(ter_base[ter_type] == 0) {
+	if(ter_base[arena] == 0) {
 		for(short i = 0; i < num_walls; i++) {
 			r1 = get_ran(1,0,3);
-			for(short j = 9; j < 35; j++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				switch(r1) {
 					case 0:
-						univ.town->terrain(j,8) = 6;
+						univ.town->terrain(j,0) = 6;
 						break;
 					case 1:
-						univ.town->terrain(8,j) = 9;
+						univ.town->terrain(0,j) = 9;
 						break;
 					case 2:
-						univ.town->terrain(j,35) = 12;
+						univ.town->terrain(j,25) = 12;
 						break;
 					case 3:
-						univ.town->terrain(32,j) = 15;
+						univ.town->terrain(25,j) = 15;
 						break;
 				}
 		}
-		if((univ.town->terrain(17,8) == 6) && (univ.town->terrain(8,20) == 9))
-			univ.town->terrain(8,8) = 21;
-		if((univ.town->terrain(32,20) == 15) && (univ.town->terrain(17,35) == 12))
-			univ.town->terrain(32,35) = 19;
-		if((univ.town->terrain(17,8) == 6) && (univ.town->terrain(32,20) == 15))
-			univ.town->terrain(32,8) = 32;
-		if((univ.town->terrain(8,20) == 9) && (univ.town->terrain(17,35) == 12))
-			univ.town->terrain(8,35) = 20;
+		if((univ.town->terrain(17,0) == 6) && (univ.town->terrain(0,20) == 9))
+			univ.town->terrain(0,0) = 21;
+		if((univ.town->terrain(25,20) == 15) && (univ.town->terrain(17,25) == 12))
+			univ.town->terrain(25,25) = 19;
+		if((univ.town->terrain(17,0) == 6) && (univ.town->terrain(25,20) == 15))
+			univ.town->terrain(25,0) = 32;
+		if((univ.town->terrain(0,20) == 9) && (univ.town->terrain(17,25) == 12))
+			univ.town->terrain(0,25) = 20;
 	}
-	if(ter_base[ter_type] == 36) {
+	if(ter_base[arena] == 36) {
 		for(short i = 0; i < num_walls; i++) {
 			r1 = get_ran(1,0,3);
-			for(short j = 9; j < 35; j++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				switch(r1) {
 					case 0:
-						univ.town->terrain(j,8) = 24;
+						univ.town->terrain(j,0) = 24;
 						break;
 					case 1:
-						univ.town->terrain(8,j) = 26;
+						univ.town->terrain(0,j) = 26;
 						break;
 					case 2:
-						univ.town->terrain(j,35) = 28;
+						univ.town->terrain(j,25) = 28;
 						break;
 					case 3:
-						univ.town->terrain(32,j) = 30;
+						univ.town->terrain(25,j) = 30;
 						break;
 				}
 		}
-		if((univ.town->terrain(17,8) == 6) && (univ.town->terrain(8,20) == 9))
-			univ.town->terrain(8,8) = 35;
-		if((univ.town->terrain(32,20) == 15) && (univ.town->terrain(17,35) == 12))
-			univ.town->terrain(32,35) = 33;
-		if((univ.town->terrain(17,8) == 6) && (univ.town->terrain(32,20) == 15))
-			univ.town->terrain(32,8) = 32;
-		if((univ.town->terrain(8,20) == 9) && (univ.town->terrain(17,35) == 12))
-			univ.town->terrain(8,35) = 34;
+		if((univ.town->terrain(17,0) == 24) && (univ.town->terrain(0,20) == 26))
+			univ.town->terrain(0,0) = 35;
+		if((univ.town->terrain(25,20) == 30) && (univ.town->terrain(17,25) == 28))
+			univ.town->terrain(25,25) = 33;
+		if((univ.town->terrain(17,0) == 24) && (univ.town->terrain(25,20) == 30))
+			univ.town->terrain(25,0) = 32;
+		if((univ.town->terrain(0,20) == 26) && (univ.town->terrain(17,25) == 28))
+			univ.town->terrain(0,25) = 34;
 	}
 	
 	// TODO: Looks like I haven't yet implemented the generalized arenas
@@ -1161,7 +1148,7 @@ void pick_lock(location where,short pc_num) {
 	if(r1 < 75)
 		will_break = true;
 	
-	r1 = get_ran(1,1,100) - 5 * univ.party[pc_num].stat_adj(eSkill::DEXTERITY) + univ.town->difficulty * 7
+	r1 = get_ran(1,1,100) - 5 * univ.party[pc_num].stat_adj(eSkill::DEXTERITY) + univ.town.door_diff_adjust() * 7
 		- 5 * univ.party[pc_num].skill(eSkill::LOCKPICKING) - which_item->abil_strength * 7;
 	
 	// Nimble?
@@ -1194,7 +1181,7 @@ void bash_door(location where,short pc_num) {
 	short r1,unlock_adjust;
 	
 	terrain = univ.town->terrain(where.x,where.y);
-	r1 = get_ran(1,1,100) - 15 * univ.party[pc_num].stat_adj(eSkill::STRENGTH) + univ.town->difficulty * 4;
+	r1 = get_ran(1,1,100) - 15 * univ.party[pc_num].stat_adj(eSkill::STRENGTH) + univ.town.door_diff_adjust() * 4;
 	
 	if(univ.scenario.ter_types[terrain].special != eTerSpec::UNLOCKABLE) {
 		add_string_to_buf("  Wrong terrain type.");
@@ -1337,7 +1324,7 @@ void draw_map(bool need_refresh) {
 		redraw_rect = view_rect;
 	}
 	else {
-		total_size = univ.town->max_dim;
+		total_size = univ.town->max_dim();
 		switch(total_size) {
 			case 64:
 				view_rect.left = minmax(0,24,univ.party.town_loc.x - 20);
@@ -1470,7 +1457,7 @@ void draw_map(bool need_refresh) {
 					
 					if(is_out() ? univ.out->roads[where.x][where.y] : univ.town.is_road(where.x,where.y)) {
 						draw_rect.inset(1,1);
-						rect_draw_some_item(*ResMgr::graphics.get("trim"),{8,112,12,116},map_gworld(),draw_rect);
+						rect_draw_some_item(*ResMgr::graphics.get("fields"),{80,28,84,32},map_gworld(),draw_rect);
 					}
 				}
 			}

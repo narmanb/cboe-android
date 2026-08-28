@@ -18,7 +18,7 @@
 		Should you find one, open a ticket here:
 	</text>
 	<text name=	'issues' relative='pos-in pos' rel-anchor='prev' top='6' left='16' colour='link' underline='true'>
-		https://github.com/calref/cboe/issues
+		https://codeberg.org/OpenBoE/oboe/issues
 	</text>
 	<button name='okay' type='regular' top='142' left='471'>OK</button>
 </dialog>

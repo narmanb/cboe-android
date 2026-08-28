@@ -117,12 +117,12 @@ void shift_universe_left() {
 	univ.party.i_w_c.x++;
 	univ.party.out_loc.x += univ.out.half_dim;
 	
-	for(short i = univ.out.half_dim; i < univ.out.max_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+	for(short i = univ.out.half_dim; i < univ.out.max_dim(); i++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i - univ.out.half_dim][j];
 	
 	for(short i = 0; i < univ.out.half_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	
 	for(short i = 0; i < univ.party.out_c.size(); i++) {
@@ -144,10 +144,10 @@ void shift_universe_right() {
 	univ.party.i_w_c.x--;
 	univ.party.out_loc.x -= univ.out.half_dim;
 	for(short i = 0; i < univ.out.half_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i + univ.out.half_dim][j];
-	for(short i = univ.out.half_dim; i < univ.out.max_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+	for(short i = univ.out.half_dim; i < univ.out.max_dim(); i++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	
 	
@@ -169,10 +169,10 @@ void shift_universe_up() {
 	univ.party.i_w_c.y++;
 	univ.party.out_loc.y += univ.out.half_dim;
 	
-	for(short i = 0; i < univ.out.max_dim; i++)
-		for(short j = univ.out.half_dim; j < univ.out.max_dim; j++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
+		for(short j = univ.out.half_dim; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i][j - univ.out.half_dim];
-	for(short i = 0; i < univ.out.max_dim; i++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
 		for(short j = 0; j < univ.out.half_dim; j++)
 			univ.out.out_e[i][j] = 0;
 	
@@ -196,11 +196,11 @@ void shift_universe_down() {
 	univ.party.i_w_c.y--;
 	univ.party.out_loc.y = univ.party.out_loc.y - univ.out.half_dim;
 	
-	for(short i = 0; i < univ.out.max_dim; i++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
 		for(short j = 0; j < univ.out.half_dim; j++)
 			univ.out.out_e[i][j] = univ.out.out_e[i][j + univ.out.half_dim];
-	for(short i = 0; i < univ.out.max_dim; i++)
-		for(short j = univ.out.half_dim; j < univ.out.max_dim; j++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
+		for(short j = univ.out.half_dim; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	
 	for(short i = 0; i < univ.party.out_c.size(); i++) {
@@ -236,8 +236,8 @@ void position_party(short out_x,short out_y,short pc_pos_x,short pc_pos_y) {
 	univ.party.i_w_c.y = (univ.party.out_loc.y > 47) ? 1 : 0;
 	for(short i = 0; i < univ.party.out_c.size(); i++)
 		univ.party.out_c[i].exists = false;
-	for(short i = 0; i < univ.out.max_dim; i++)
-		for(short j = 0; j < univ.out.max_dim; j++)
+	for(short i = 0; i < univ.out.max_dim(); i++)
+		for(short j = 0; j < univ.out.max_dim(); j++)
 			univ.out.out_e[i][j] = 0;
 	build_outdoors();
 }
@@ -341,6 +341,8 @@ std::string name_alphabetical(std::string a) {
 	// The scenario editor will let you prepend whitespace to a scenario name :(
 	boost::algorithm::trim_left(a);
 	std::transform(a.begin(), a.end(), a.begin(), tolower);
+	// Some party makers start with the name of the corresponding scenario in quotes
+	if(a.substr(0,1) == "\"") a.erase(a.begin(), a.begin() + 1);
 	if(a.substr(0,2) == "a ") a.erase(a.begin(), a.begin() + 2);
 	else if(a.substr(0,4) == "the ") a.erase(a.begin(), a.begin() + 4);
 	return a;
@@ -359,11 +361,9 @@ std::vector<scen_header_type> build_scen_headers() {
 		std::string scen_file;
 		while(std::getline(in, scen_file)){
 			scen_header_type scen_head;
-			fs::path full_path;
-			for(fs::path scenDir : all_scen_dirs()){
-				full_path = scenDir / scen_file;
-				if (fs::exists(full_path))
-					break;
+			fs::path full_path = locate_scenario(scen_file, true);
+			if(full_path.empty()){
+				LOG("Scenario missing! " + scen_file);
 			}
 			if(load_scenario_header(full_path, scen_head)){
 				scen_headers.push_back(scen_head);

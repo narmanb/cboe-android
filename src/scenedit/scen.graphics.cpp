@@ -535,15 +535,15 @@ static void apply_mode_buttons() {
 				std::ostringstream strb;
 				switch(mode) {
 					case 0:
-						strb << i << " - " << (*scenario.scen_specials[i].type).name();
+						strb << i << " - " << scenario.scen_specials[i].editor_hint(scenario);
 						set_rb(i,RB_SCEN_SPEC, i, strb.str());
 						break;
 					case 1:
-						strb << i << " - " << (*current_terrain->specials[i].type).name();
+						strb << i << " - " << current_terrain->specials[i].editor_hint(scenario);
 						set_rb(i,RB_OUT_SPEC, i, strb.str());
 						break;
 					case 2:
-						strb << i << " - " << (*town->specials[i].type).name();
+						strb << i << " - " << town->specials[i].editor_hint(scenario);
 						set_rb(i,RB_TOWN_SPEC, i, strb.str());
 						break;
 				}
@@ -957,7 +957,7 @@ rectangle visible_bounds() {
 		// Width available:  64 4x4 tiles, 42 6x6 tiles, or 21 12x12 tiles -- 256 pixels
 		// Height available: 81 4x4 tiles, 54 6x6 tiles, or 27 12x12 tiles -- 324 pixels
 		short size = mini_map_scales[cur_viewing_mode - 1];
-		int max_dim = get_current_area()->max_dim;
+		int max_dim = get_current_area()->max_dim();
 		int xMin = 0, yMin = 0, xMax = max_dim, yMax = max_dim;
 		if(!editing_town){
 			--xMin;
@@ -1259,7 +1259,7 @@ void draw_terrain(){
 		frame_rect(mainPtr(), terrain_rect, sf::Color::Black);
 
 		short size = mini_map_scales[cur_viewing_mode - 1];
-		int max = get_current_area()->max_dim;
+		int max = get_current_area()->max_dim();
 		int min = 0;
 		if(!editing_town){
 			--min;
@@ -1484,7 +1484,6 @@ void draw_one_tiny_terrain_spot (short i,short j,ter_num_t terrain_to_draw,short
 		} else {
 			sf::Texture& small_ter_gworld = *ResMgr::graphics.get("termap");
 			if(picture_wanted >= 960) {
-				picture_wanted -= 960;
 				from_rect.offset(12 * 20, (picture_wanted - 960) * 12);
 				rect_draw_some_item(small_ter_gworld, from_rect, mainPtr(), dest_rect);
 			} else {

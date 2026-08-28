@@ -24,7 +24,7 @@
 		Open a ticket here:
 	</text>
 	<text relative='abs pos' rel-anchor='prev' top='10' left='60' width='353' colour='link' height='17'>
-		https://github.com/calref/cboe/issues
+		https://codeberg.org/OpenBoE/oboe/issues
 	</text>
 	<button name='okay' type='regular' relative='abs pos' rel-anchor='prev' top='10' left='430'>OK</button>
 </dialog>

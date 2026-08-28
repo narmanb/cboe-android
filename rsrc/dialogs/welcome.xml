@@ -51,7 +51,7 @@
 		http://openboe.com
 	</text>
 	<text name='src' relative='pos-in pos' rel-anchor='prev' top='0' left='0' colour='link' underline='true'>
-		https://github.com/calref/cboe
+		https://codeberg.org/OpenBoE/oboe
 	</text>
 	<button name='okay' relative='neg' type='regular' top='30' left='70'>OK</button>
 </dialog>

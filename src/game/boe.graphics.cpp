@@ -154,9 +154,6 @@ share_mess_rect = {120,384,179,504};
 rectangle start_buttons_source_rect = {0,0,186,190},
 start_buttons_rect = {214,30,400,220};
 
-// Array to store which spots have been seen. Time-saver for drawing fields
-char spot_seen[9][9];
-
 char anim_str[60];
 location anim_str_loc;
 
@@ -804,7 +801,6 @@ extern std::list<text_label_t> posted_labels;
 //mode ... if 1, don't place on screen after redoing
 // if 2, only redraw over active monst
 void draw_terrain(short mode) {
-	location where_draw;
 	location sector_p_in,view_loc;
 	char can_draw;
 	ter_num_t spec_terrain;
@@ -841,7 +837,7 @@ void draw_terrain(short mode) {
 		max_dim_x = min(96, 48 * univ.scenario.outdoors.width());
 		max_dim_y = min(96, 48 * univ.scenario.outdoors.height());
 	}else {
-		max_dim_x = max_dim_y = univ.town->max_dim;
+		max_dim_x = max_dim_y = univ.town->max_dim();
 	}
 
 	for(short i = 0; i < 13; i++)
@@ -861,7 +857,7 @@ void draw_terrain(short mode) {
 	
 	for(short i = 0; i < 13; i++)
 		for(short j = 0; j < 13; j++) {
-			where_draw =  (is_out()) ? univ.party.out_loc : center;
+			location where_draw =  (is_out()) ? univ.party.out_loc : center;
 			where_draw.x += i - 6;
 			where_draw.y += j - 6;
 			if (where_draw.x < 0 || where_draw.y < 0 || where_draw.x >= max_dim_x || where_draw.y >= max_dim_y)
@@ -876,7 +872,7 @@ void draw_terrain(short mode) {
 	forcecage_locs.clear();
 	for(short q = 0; q < 9; q++) {
 		for(short r = 0; r < 9; r++) {
-			where_draw = (is_out()) ? univ.party.out_loc : center;
+			location where_draw = (is_out()) ? univ.party.out_loc : center;
 			where_draw.x += q - 4;
 			where_draw.y += r - 4;
 			if (where_draw.x < 0 || where_draw.y < 0 || where_draw.x >= max_dim_x || where_draw.y >= max_dim_y){
@@ -890,12 +886,12 @@ void draw_terrain(short mode) {
 				// Warning - this section changes where_draw
 				if(where_draw.x < 0)
 					where_draw.x = -1;
-				if(where_draw.x > univ.town->max_dim - 1)
-					where_draw.x = univ.town->max_dim;
+				if(where_draw.x > univ.town->max_dim() - 1)
+					where_draw.x = univ.town->max_dim();
 				if(where_draw.y < 0)
 					where_draw.y = -1;
-				if(where_draw.y > univ.town->max_dim - 1)
-					where_draw.y = univ.town->max_dim;
+				if(where_draw.y > univ.town->max_dim() - 1)
+					where_draw.y = univ.town->max_dim();
 				if(can_see_light(view_loc,where_draw,sight_obscurity) < 5)
 					can_draw = 1;
 				else can_draw = 0;
@@ -926,7 +922,6 @@ void draw_terrain(short mode) {
 				if((overall_mode == MODE_LOOK_TOWN) && (can_draw == 0))
 					can_draw = (party_can_see(where_draw) < 6) ? 1 : 0;
 			}
-			spot_seen[q][r] = can_draw;
 			
 			if(fog_lifted) can_draw = true;
 			
@@ -1089,9 +1084,9 @@ void place_trim(short q,short r,location where,ter_num_t ter_type) {
 	else {
 		// TODO: Shouldn't we subtract one here?
 		// The outdoors case (above) does subtract 1, so one of them must be wrong...
-		if(where.x == univ.town->max_dim)
+		if(where.x == univ.town->max_dim())
 			at_right = true;
-		if(where.y == univ.town->max_dim)
+		if(where.y == univ.town->max_dim())
 			at_bot = true;
 	}
 	
@@ -1186,17 +1181,21 @@ void place_trim(short q,short r,location where,ter_num_t ter_type) {
 }
 
 static void init_trim_mask(std::unique_ptr<sf::Texture>& mask, rectangle src_rect) {
-	sf::RenderTexture render;
+	static sf::RenderTexture render;
+	static bool init = false;
+	if(!init){
+		render.create(28, 36);
+		init = true;
+	}
 	rectangle dest_rect;
 	dest_rect.top = src_rect.top % 36;
 	dest_rect.bottom = (src_rect.bottom - 1) % 36 + 1;
 	dest_rect.left = src_rect.left % 28;
 	dest_rect.right = (src_rect.right - 1) % 28 + 1;
-	std::tie(dest_rect.top, dest_rect.bottom) = std::make_tuple(36 - dest_rect.top, 36 - dest_rect.bottom);
 	render.create(28, 36);
 	render.clear(sf::Color::White);
 	rect_draw_some_item(*ResMgr::graphics.get("trim"), src_rect, render, dest_rect);
-	render.display();
+	// render.display(); // Using it as a mask, we don't need to flip
 	mask.reset(new sf::Texture);
 	mask->create(28, 36);
 	mask->update(render.getTexture().copyToImage());
@@ -1246,6 +1245,13 @@ void draw_trim(short q,short r,short which_trim,ter_num_t ground_ter) {
 	}
 	sf::Color test_color = {0,0,0}, store_color;
 	
+	location targ;
+	targ.x = q;
+	targ.y = r;
+	if(supressing_some_spaces && (targ != ok_space[0]) && (targ != ok_space[1]) &&
+		(targ != ok_space[2]) && (targ != ok_space[3]))
+		return;
+
 	unsigned short pic = univ.scenario.ter_types[ground_ter].picture;
 	if(pic < 960){
 		int which_sheet = pic / 50;
@@ -1349,14 +1355,14 @@ void place_road(short q,short r,location where,bool here) {
 			rect_draw_some_item (roads_gworld, road_rects[1], terrain_screen_gworld(), to_rect);
 		}
 		
-		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim - 1))
+		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim() - 1))
 			|| extend_road_terrain(where.x + 1, where.y)) {
 			to_rect = road_dest_rects[1];
 			to_rect.offset(13 + q * 28,13 + r * 36);
 			rect_draw_some_item (roads_gworld, road_rects[0], terrain_screen_gworld(), to_rect);
 		}
 		
-		if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim - 1))
+		if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim() - 1))
 			|| extend_road_terrain(where.x, where.y + 1)) {
 			to_rect = road_dest_rects[2];
 			to_rect.offset(13 + q * 28,13 + r * 36);
@@ -1367,67 +1373,6 @@ void place_road(short q,short r,location where,bool here) {
 			to_rect = road_dest_rects[3];
 			to_rect.offset(13 + q * 28,13 + r * 36);
 			rect_draw_some_item (roads_gworld, road_rects[0], terrain_screen_gworld(), to_rect);
-		}
-	}else{
-		// TODO: I suspect this branch is now irrelevant.
-		ter_num_t ter = coord_to_ter(where.x, where.y);
-		ter_num_t ref = coord_to_ter(where.x,where.y);
-		bool horz = false, vert = false;
-		eTrimType trim = eTrimType::NONE, vertTrim = eTrimType::NONE;
-		if(ref < univ.scenario.ter_types.size()) {
-			trim = univ.scenario.ter_types[ref].trim_type;
-		}
-		if(ter < univ.scenario.ter_types.size()) {
-			vertTrim = univ.scenario.ter_types[ter].trim_type;
-		}
-		if(where.y > 0)
-			ter = coord_to_ter(where.x,where.y - 1);
-		if((where.y == 0) || connect_roads(ter))
-			vert = can_build_roads_on(ref);
-		else if((vertTrim == eTrimType::S && trim == eTrimType::N) || (vertTrim == eTrimType::N && trim == eTrimType::S))
-			vert = can_build_roads_on(ref);
-		
-		if(((is_out()) && (where.x < 96)) || (!(is_out()) && (where.x < univ.town->max_dim - 1)))
-			ter = coord_to_ter(where.x + 1,where.y);
-		eTrimType horzTrim = univ.scenario.ter_types[ter].trim_type;
-		if(((is_out()) && (where.x == 96)) || (!(is_out()) && (where.x == univ.town->max_dim - 1))
-			|| connect_roads(ter))
-			horz = can_build_roads_on(ref);
-		else if((horzTrim == eTrimType::W && trim == eTrimType::E) || (horzTrim == eTrimType::E && trim == eTrimType::W))
-			horz = can_build_roads_on(ref);
-		
-		if(vert){
-			if(((is_out()) && (where.y < 96)) || (!(is_out()) && (where.y < univ.town->max_dim - 1)))
-				ter = coord_to_ter(where.x,where.y + 1);
-			eTrimType vertTrim = univ.scenario.ter_types[ter].trim_type;
-			if(((is_out()) && (where.y == 96)) || (!(is_out()) && (where.y == univ.town->max_dim - 1))
-				|| connect_roads(ter))
-				vert = can_build_roads_on(ref);
-			else if((vertTrim == eTrimType::S && trim == eTrimType::N) || (vertTrim == eTrimType::N && trim == eTrimType::S))
-				vert = can_build_roads_on(ref);
-			else vert = false;
-		}
-		
-		if(horz){
-			if(where.x > 0)
-				ter = coord_to_ter(where.x - 1,where.y);
-			eTrimType horzTrim = univ.scenario.ter_types[ter].trim_type;
-			if((where.x == 0) || connect_roads(ter))
-				horz = can_build_roads_on(ref);
-			else if((horzTrim == eTrimType::W && trim == eTrimType::E) || (horzTrim == eTrimType::E && trim == eTrimType::W))
-				horz = can_build_roads_on(ref);
-			else horz = false;
-		}
-		
-		if(horz){
-			to_rect = road_dest_rects[5];
-			to_rect.offset(13 + q * 28,13 + r * 36);
-			rect_draw_some_item (roads_gworld, road_rects[2], terrain_screen_gworld(), to_rect);
-		}
-		if(vert){
-			to_rect = road_dest_rects[4];
-			to_rect.offset(13 + q * 28,13 + r * 36);
-			rect_draw_some_item (roads_gworld, road_rects[3], terrain_screen_gworld(), to_rect);
 		}
 	}
 }

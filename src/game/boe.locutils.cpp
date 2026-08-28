@@ -134,14 +134,14 @@ location local_to_global(location local) {
 	return global;
 }
 bool loc_off_world(location p1) {
+	if(is_out())  return !univ.out.is_on_map(p1.x, p1.y);
 	return !univ.town.is_on_map(p1.x, p1.y);
 }
 
 bool loc_off_act_area(location p1) {
-	if((p1.x > univ.town->in_town_rect.left) && (p1.x < univ.town->in_town_rect.right) &&
-		(p1.y > univ.town->in_town_rect.top) && (p1.y < univ.town->in_town_rect.bottom))
-	 	return false;
-	return true;
+	if(is_out()) return !univ.out->is_on_map(p1);
+	if(!univ.town.is_on_map(p1.x, p1.y)) return true;
+	return !univ.town->in_town_rect.contains(p1);
 }
 
 location get_cur_loc() {
@@ -248,8 +248,8 @@ void update_explored(const location dest) {
 			}
 	} else {
 		make_explored(dest.x,dest.y);
-		for(look.x = max(0,dest.x - 4); look.x < min(univ.town->max_dim,dest.x + 5); look.x++)
-			for(look.y = max(0,dest.y - 4); look.y < min(univ.town->max_dim,dest.y + 5); look.y++)
+		for(look.x = max(0,dest.x - 4); look.x < min(univ.town->max_dim(),dest.x + 5); look.x++)
+			for(look.y = max(0,dest.y - 4); look.y < min(univ.town->max_dim(),dest.y + 5); look.y++)
 				if(!is_explored(look.x,look.y))
 					if((can_see_light(dest, look,sight_obscurity) < 5) && (pt_in_light(dest,look)))
 						make_explored(look.x,look.y);
@@ -322,18 +322,18 @@ bool monst_can_be_there(location loc,short m_num) {
 	location destination;
 	
 	// First clear monst away so it doesn't block itself
-	univ.town.monst[m_num].cur_loc.x += univ.town->max_dim;
+	univ.town.monst[m_num].cur_loc.x += univ.town->max_dim();
 	
 	for(short i = 0; i < univ.town.monst[m_num].x_width; i++)
 		for(short j = 0; j < univ.town.monst[m_num].y_width; j++) {
 			destination.x = loc.x + i; destination.y = loc.y + j;
 			if((is_blocked(destination))
 				|| (loc_off_act_area(destination))) {
-				univ.town.monst[m_num].cur_loc.x -= univ.town->max_dim;
+				univ.town.monst[m_num].cur_loc.x -= univ.town->max_dim();
 				return false;
 			}
 		}
-	univ.town.monst[m_num].cur_loc.x -= univ.town->max_dim;
+	univ.town.monst[m_num].cur_loc.x -= univ.town->max_dim();
 	return true;
 }
 

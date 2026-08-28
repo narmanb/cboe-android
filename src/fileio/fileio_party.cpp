@@ -284,6 +284,7 @@ bool load_party_v1(fs::path file_to_load, cUniverse& real_univ, bool town_restor
 		univ.file = path;
 	}else{
 		univ.party.scen_name = "";
+		store_party.scen_name[0] = '\0';
 	}
 	
 	univ.party.import_legacy(store_party, univ);
@@ -302,8 +303,8 @@ bool load_party_v1(fs::path file_to_load, cUniverse& real_univ, bool town_restor
 		univ.import_legacy(o_maps);
 		univ.town.import_legacy(sfx, misc_i);
 		if(town_restore) // Check items in crates/barrels
-			for(int i = 0; i < univ.town->max_dim; i++) {
-				for(int j = 0; j < univ.town->max_dim; j++) {
+			for(int i = 0; i < univ.town->max_dim(); i++) {
+				for(int j = 0; j < univ.town->max_dim(); j++) {
 					if(univ.town.is_barrel(i,j) || univ.town.is_crate(i,j)) {
 						for(cItem item : univ.town.items) {
 							if(item.item_loc == loc(i,j) && item.contained)
@@ -454,7 +455,7 @@ bool load_party_v2(fs::path file_to_load, cUniverse& real_univ, cCustomGraphics&
 			// Read town maps
 			std::istream& fin2 = partyIn.getFile("save/townmaps.dat");
 			for(int i = 0; i < univ.scenario.towns.size(); i++) {
-				for(int j = 0; j < univ.scenario.towns[i]->max_dim; j++) {
+				for(int j = 0; j < univ.scenario.towns[i]->max_dim(); j++) {
 					fin2 >> univ.scenario.towns[i]->maps[j];
 				}
 			}
@@ -549,7 +550,7 @@ static bool save_party_const(const cUniverse& univ, fs::path dest_file = "") {
 			// Write the town map data
 			std::ostream& fout = partyOut.newFile("save/townmaps.dat");
 			for(int i = 0; i < univ.scenario.towns.size(); i++)
-				for(int j = 0; j < univ.scenario.towns[i]->max_dim; j++)
+				for(int j = 0; j < univ.scenario.towns[i]->max_dim(); j++)
 					fout << univ.scenario.towns[i]->maps[j] << '\n';
 		}
 		

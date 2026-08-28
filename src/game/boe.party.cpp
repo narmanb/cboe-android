@@ -1371,8 +1371,8 @@ void cast_town_spell(location where) {
 			
 		case eSpell::ANTIMAGIC:
 			add_string_to_buf("  You create an antimagic cloud.");
-			for(loc.x = 0; loc.x < univ.town->max_dim; loc.x++)
-				for(loc.y = 0; loc.y < univ.town->max_dim; loc.y++)
+			for(loc.x = 0; loc.x < univ.town->max_dim(); loc.x++)
+				for(loc.y = 0; loc.y < univ.town->max_dim(); loc.y++)
 					if(dist(where,loc) <= 2 && can_see(where,loc,sight_obscurity) < 5 &&
 					   ((abs(loc.x - where.x) < 2) || (abs(loc.y - where.y) < 2)))
 						univ.town.set_antimagic(loc.x,loc.y,true);
@@ -1385,10 +1385,10 @@ void cast_town_spell(location where) {
 		case eSpell::UNLOCK:
 			// TODO: Is the unlock spell supposed to have a max range?
 			if(univ.scenario.ter_types[ter].special == eTerSpec::UNLOCKABLE){
-				if(univ.scenario.ter_types[ter].flag2 == 10)
+				if(univ.scenario.ter_types[ter].flag2 == 10){
 					r1 = 10000;
-				else{
-					r1 = get_ran(1,1,100) - 5 * adj + 5 * univ.town->difficulty;
+				}else{
+					r1 = get_ran(1,1,100) - 5 * adj + 5 * univ.town.door_diff_adjust();
 					r1 += univ.scenario.ter_types[ter].flag2 * 7;
 				}
 				if(r1 < (135 - combat_percent[min(19,level)])) {

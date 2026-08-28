@@ -809,7 +809,7 @@ void commit_stroke() {
 	}else if(!current_creatures_placed.empty()){
 		undo_list.add(action_ptr(new aPlaceEraseCreature(current_creatures_placed.size() > 1 ? "Place Creatures" : "Place Creature", true, current_creatures_placed)));
 		update_edit_menu();
-		current_items_placed.clear();
+		current_creatures_placed.clear();
 	}else if(!current_fields_cleared.empty()){
 		undo_list.add(action_ptr(new aClearFields(current_fields_cleared)));
 		update_edit_menu();
@@ -1431,7 +1431,7 @@ static bool handle_terrain_action(location the_point, bool ctrl_hit) {
 		need_redraw = true;
 		mouse_button_held = true;
 	}
-	auto max_dim = cur_area->max_dim - 5;
+	auto max_dim = cur_area->max_dim() - 5;
 	// This allows you to see a strip of terrain from the adjacent sector when editing outdoors
 	if(!editing_town) max_dim++;
 	if((the_point.in(border_rect[2]))) {
@@ -2047,8 +2047,8 @@ void swap_terrain() {
 	cArea* cur_area = get_current_area();
 	stroke_ter_changes_t changes;
 	
-	for(short i = 0; i < cur_area->max_dim; i++)
-		for(short j = 0; j < cur_area->max_dim; j++) {
+	for(short i = 0; i < cur_area->max_dim(); i++)
+		for(short j = 0; j < cur_area->max_dim(); j++) {
 			ter = cur_area->terrain(i,j);
 			if((ter == a) && (get_ran(1,1,100) <= c)) {
 				set_terrain(loc(i,j), b, changes);
@@ -2276,14 +2276,14 @@ static bool handle_outdoor_sec_shift(int dx, int dy){
 		// match the terrain view to where we were
 		start_out_edit();
 		if(dx < 0) {
-			cen_x = get_current_area()->max_dim - 4;
+			cen_x = get_current_area()->max_dim() - 4;
 		}else if(dx > 0){
 			cen_x = 3;
 		}else{
 			cen_x = last_cen_x;
 		}
 		if(dy < 0){
-			cen_y = get_current_area()->max_dim - 4;
+			cen_y = get_current_area()->max_dim() - 4;
 		}else if(dy > 0){
 			cen_y = 3;
 		}else{
@@ -2297,7 +2297,7 @@ static bool handle_outdoor_sec_shift(int dx, int dy){
 void handle_editor_screen_shift(int dx, int dy) {
 	// Outdoors, you can see 1 tile across the border with neighboring sections:
 	int min = (editing_town ? 0 : -1);
-	int max = get_current_area()->max_dim - 1;
+	int max = get_current_area()->max_dim() - 1;
 	if(!editing_town) max++;
 	// When zoomed out, you can move your actual center beyond the zoomed-out camera limit,
 	// then zoom in and be centered on that place.
@@ -2335,7 +2335,10 @@ void handle_editor_screen_shift(int dx, int dy) {
 		if(town_entrances.size() == 1){
 			town_entrance_t only_entrance = town_entrances[0];
 			cChoiceDlog shift_prompt("shift-town-entrance", {"yes", "no"});
-			shift_prompt->getControl("out-sec").setText(boost::lexical_cast<std::string>(only_entrance.out_sec));
+			cControl& text = shift_prompt->getControl("prompt");
+			text.replaceText("{sec}", boost::lexical_cast<std::string>(only_entrance.out_sec));
+			text.replaceText("{loc}", boost::lexical_cast<std::string>(only_entrance.loc));
+			text.replaceText("{loc_str}", scenario.outdoors[only_entrance.out_sec.x][only_entrance.out_sec.y]->loc_str(only_entrance.loc));
 
 			if(shift_prompt.show() == "yes"){
 				set_current_out(only_entrance.out_sec, true);
@@ -2350,9 +2353,9 @@ void handle_editor_screen_shift(int dx, int dy) {
 			std::vector<std::string> entrance_strings;
 			for(town_entrance_t entrance : town_entrances){
 				std::ostringstream sstr;
-				sstr << "Entrance in section " << entrance.out_sec << " at " <<  entrance.loc;
+				sstr << "Entrance in section " << entrance.out_sec << " at " <<  entrance.loc
+						<< " (" <<scenario.outdoors[entrance.out_sec.x][entrance.out_sec.y]->loc_str(entrance.loc) << ")";
 				entrance_strings.push_back(sstr.str());
-
 			}
 			cStringChoice dlog(entrance_strings, "Shift to one of this town's entrances in the outdoors?");
 			size_t choice = dlog.show(-1);
@@ -2395,8 +2398,8 @@ void change_circle_terrain(location center,short radius,ter_num_t terrain_type,s
 	location l;
 	cArea* cur_area = get_current_area();
 	
-	for(short i = 0; i < cur_area->max_dim; i++)
-		for(short j = 0; j < cur_area->max_dim; j++) {
+	for(short i = 0; i < cur_area->max_dim(); i++)
+		for(short j = 0; j < cur_area->max_dim(); j++) {
 			l.x = i;
 			l.y = j;
 			if((dist(center,l) <= radius) && (get_ran(1,1,20) <= probability))
@@ -2410,8 +2413,8 @@ void change_rect_terrain(rectangle r,ter_num_t terrain_type,short probability,bo
 	cArea* cur_area = get_current_area();
 	stroke_ter_changes_t changes;
 	
-	for(short i = 0; i < cur_area->max_dim; i++)
-		for(short j = 0; j < cur_area->max_dim; j++) {
+	for(short i = 0; i < cur_area->max_dim(); i++)
+		for(short j = 0; j < cur_area->max_dim(); j++) {
 			l.x = i;
 			l.y = j;
 			if((i >= r.left) && (i <= r.right) && (j >= r.top) && (j <= r.bottom)
@@ -2460,18 +2463,21 @@ void frill_up_terrain() {
 	cArea* cur_area = get_current_area();
 	stroke_ter_changes_t changes;
 	
-	for(short i = 0; i < cur_area->max_dim; i++)
-		for(short j = 0; j < cur_area->max_dim; j++) {
+	for(short i = 0; i < cur_area->max_dim(); i++)
+		for(short j = 0; j < cur_area->max_dim(); j++) {
 			terrain_type = cur_area->terrain(i,j);
+			bool changed = false;
 			
 			for(size_t k = 0; k < scenario.ter_types.size(); k++) {
 				if(terrain_type == k) continue;
 				cTerrain& ter = scenario.ter_types[k];
-				if(terrain_type == ter.frill_for && get_ran(1,1,100) < ter.frill_chance)
+				if(terrain_type == ter.frill_for && get_ran(1,1,100) < ter.frill_chance){
 					terrain_type = k;
+					changed = true;
+				}
 			}
 			
-			set_terrain(loc(i, j), terrain_type, changes);
+			if(changed) set_terrain(loc(i, j), terrain_type, changes);
 		}
 	undo_list.add(action_ptr(new aDrawTerrain("Frill Up Terrain", changes)));
 	update_edit_menu();
@@ -2483,8 +2489,8 @@ void unfrill_terrain() {
 	cArea* cur_area = get_current_area();
 	stroke_ter_changes_t changes;
 	
-	for(short i = 0; i < cur_area->max_dim; i++)
-		for(short j = 0; j < cur_area->max_dim; j++) {
+	for(short i = 0; i < cur_area->max_dim(); i++)
+		for(short j = 0; j < cur_area->max_dim(); j++) {
 			terrain_type = cur_area->terrain(i,j);
 			cTerrain& ter = scenario.ter_types[terrain_type];
 			
@@ -2705,7 +2711,7 @@ void adjust_space(location l, stroke_ter_changes_t& stroke_changes) {
 	cArea* cur_area = get_current_area();
 	
 	if(!cur_area->is_on_map(l)) return;
-	size_t size = cur_area->max_dim;
+	size_t size = cur_area->max_dim();
 	ter_num_t off_map = -1;
 	
 	ter_num_t store_ter[3][3];
@@ -2833,8 +2839,8 @@ bool place_item(location spot_hit,short which_item,bool property,bool always,sho
 void place_items_in_town() {
 	location l;
 	std::map<size_t, cTown::cItem> items_placed;
-	for(short i = 0; i < town->max_dim; i++)
-		for(short j = 0; j < town->max_dim; j++) {
+	for(short i = 0; i < town->max_dim(); i++)
+		for(short j = 0; j < town->max_dim(); j++) {
 			l.x = i;
 			l.y = j;
 			
@@ -2888,10 +2894,11 @@ void place_edit_special(location loc) {
 		bool is_new = false;
 		if(i == specials.size()){
 			specials.emplace_back(-1,-1,-1);
+			get_current_area()->specials.emplace_back();
 			is_new = true;
 		}
 		if(specials[i].spec < 0) {
-			if(edit_spec_enc(i, editing_town ? 2: 1, nullptr, is_new)) {
+			if(edit_spec_enc(get_current_area()->specials.size()-1, editing_town ? 2: 1, nullptr, is_new)) {
 				specials[i] = loc;
 				specials[i].spec = i;
 				undo_list.add(action_ptr(new aPlaceEraseSpecial("Place Special Encounter", true, specials[i])));
@@ -3045,8 +3052,8 @@ static void restore_current_town_state() {
 void start_town_edit() {
 	std::ostringstream strb;
 	small_any_drawn = false;
-	cen_x = town->max_dim / 2;
-	cen_y = town->max_dim / 2;
+	cen_x = town->max_dim() / 2;
+	cen_y = town->max_dim() / 2;
 	reset_lb();
 	strb << "Editing Town " << cur_town;
 	set_lb(0,LB_TITLE,LB_NO_ACTION,strb.str());
@@ -3071,8 +3078,8 @@ void start_town_edit() {
 	set_string("Drawing mode",scenario.ter_types[current_terrain_type].name);
 	place_location();
 	// TODO this is hardcoding cave floor and grass as the only ground terrains
-	for(short i = 0; i < town->max_dim; i++)
-		for(short j = 0; j < town->max_dim; j++)
+	for(short i = 0; i < town->max_dim(); i++)
+		for(short j = 0; j < town->max_dim(); j++)
 			if(town->terrain(i,j) == 0)
 				current_ground = 0;
 			else if(town->terrain(i,j) == 2)

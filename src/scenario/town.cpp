@@ -119,7 +119,7 @@ cTown::cTown(cScenario& scenario, size_t dim) : cArea(dim), scenario(&scenario),
 }
 
 void cTown::init_start() {
-	short s = this->max_dim;
+	short s = this->max_dim();
 	start_locs[0].x = s / 2;
 	start_locs[0].y = 4;
 	start_locs[2].x = s / 2;
@@ -202,8 +202,8 @@ void cTown::set_up_lights() {
 	std::fill(lighting.begin() + 1, lighting.end(), lighting[0]);
 	
 	// Find bonfires, braziers, etc.
-	for(short i = 0; i < this->max_dim; i++) {
-		for(short j = 0; j < this->max_dim; j++) {
+	for(short i = 0; i < this->max_dim(); i++) {
+		for(short j = 0; j < this->max_dim(); j++) {
 			location l{i,j};
 			ter_num_t ter = this->terrain(i,j);
 			short rad = 0;
@@ -212,8 +212,8 @@ void cTown::set_up_lights() {
 			}
 			if(rad > 0) {
 				location where;
-				for(where.x = std::max(0,i - rad); where.x < min(this->max_dim,short(i + rad + 1)); where.x++) {
-					for(where.y = std::max(0,j - rad); where.y < min(this->max_dim,short(j + rad + 1)); where.y++) {
+				for(where.x = std::max(0,i - rad); where.x < min(this->max_dim(),short(i + rad + 1)); where.x++) {
+					for(where.y = std::max(0,j - rad); where.y < min(this->max_dim(),short(j + rad + 1)); where.y++) {
 						if(!lighting[where.x][where.y] && dist(where,l) <= rad && can_see(l,where,get_obscurity) < 5) {
 							lighting[where.x].set(where.y);
 						}

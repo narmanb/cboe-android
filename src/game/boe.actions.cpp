@@ -1409,6 +1409,11 @@ void handle_victory(bool force, bool record) {
 	univ.exportGraphics();
 	univ.exportSummons();
 	univ.clear_stored_pcs();
+	// Saved monsters are not valid now
+	for(auto& pop : univ.party.creature_save){
+		pop.which_town = 200;
+		pop.clear();
+	}
 	reload_startup();
 	overall_mode = MODE_STARTUP;
 	draw_startup(0);
@@ -1701,10 +1706,10 @@ bool handle_action(const sf::Event& event, cFramerateLimiter& fps_limiter) {
 		if(the_point.x < world_screen.left && center.x > univ.town->in_town_rect.left && center.x > 4) {
 			screen_shift(-1, 0, need_redraw);
 		}
-		if(the_point.y > world_screen.bottom && center.y < univ.town->in_town_rect.bottom && center.y < univ.town->max_dim - 5) {
+		if(the_point.y > world_screen.bottom && center.y < univ.town->in_town_rect.bottom && center.y < univ.town->max_dim() - 5) {
 			screen_shift(0, 1, need_redraw);
 		}
-		if(the_point.x > world_screen.right && center.x < univ.town->in_town_rect.right && center.x < univ.town->max_dim - 5) {
+		if(the_point.x > world_screen.right && center.x < univ.town->in_town_rect.right && center.x < univ.town->max_dim() - 5) {
 			screen_shift(1, 0, need_redraw);
 		}
 	}
@@ -2363,12 +2368,12 @@ void debug_magic_map() {
 		record_action("debug_magic_map", "");
 	}
 	if(overall_mode == MODE_OUTDOORS) {
-		for(short i = 0; i < univ.out.max_dim; i++)
-			for(short j = 0; j < univ.out.max_dim; j++)
+		for(short i = 0; i < univ.out.max_dim(); i++)
+			for(short j = 0; j < univ.out.max_dim(); j++)
 				make_explored(i,j);
 	} else {
-		for(short i = 0; i < univ.town->max_dim; i++)
-			for(short j = 0; j < univ.town->max_dim; j++)
+		for(short i = 0; i < univ.town->max_dim(); i++)
+			for(short j = 0; j < univ.town->max_dim(); j++)
 				make_explored(i,j);
 	}
 	clear_map();
@@ -3145,8 +3150,8 @@ bool handle_scroll(const sf::Event& event) {
 	int amount = event.mouseWheel.delta;
 	if(scrollableModes.count(overall_mode) && pos.in(world_screen)) {
 		if(kb.isCtrlPressed())
-			center.x = minmax(4, univ.town->max_dim - 5, center.x - amount);
-		else center.y = minmax(4, univ.town->max_dim - 5, center.y - amount);
+			center.x = minmax(4, univ.town->max_dim() - 5, center.x - amount);
+		else center.y = minmax(4, univ.town->max_dim() - 5, center.y - amount);
 	}
 	return true;
 }

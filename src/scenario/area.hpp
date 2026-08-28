@@ -34,8 +34,9 @@ enum {
 const int LOC_UNUSED = AREA_HUGE * 2;
 
 class cArea {
+	size_t dimension;
 public:
-	const size_t max_dim;
+	size_t max_dim() const { return dimension; };
 	vector2d<ter_num_t> terrain;
 	std::vector<spec_loc_t> special_locs;
 	std::vector<sign_loc_t> sign_locs;
@@ -46,13 +47,24 @@ public:
 	std::vector<boost::dynamic_bitset<>> maps;
 	
 	explicit cArea(size_t dim)
-		: max_dim(dim)
+		: dimension(dim)
 		, terrain(dim, dim)
 		, maps(dim, boost::dynamic_bitset<>(dim))
 	{}
 
 	bool is_on_map(location loc) const {
-		return loc.x < max_dim && loc.y < max_dim && loc.x >= 0 && loc.y >= 0;
+		return loc.x < max_dim() && loc.y < max_dim() && loc.x >= 0 && loc.y >= 0;
+	}
+
+	std::string loc_str(location where) {
+		std::string str = name;
+		for(info_rect_t rect : area_desc){
+			if(!rect.empty() && rect.contains(where)){
+				str += ": " + rect.descr;
+				break;
+			}
+		}
+		return str;
 	}
 };
 
