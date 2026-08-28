@@ -1,4 +1,4 @@
-name: Import Codeberg upstream
+name: Inspect Codeberg upstream
 
 on:
   push:
@@ -6,40 +6,28 @@ on:
       - codeberg-import-runner
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  import:
+  inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Clone Codeberg and publish isolated comparison snapshot
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clone and inspect Codeberg history
         run: |
           set -euo pipefail
-
           git clone https://codeberg.org/OpenBoE/oboe.git upstream
-          UPSTREAM_HEAD="$(git -C upstream rev-parse HEAD)"
-          UPSTREAM_BRANCH="$(git -C upstream branch --show-current)"
-          echo "Codeberg default branch: ${UPSTREAM_BRANCH}"
-          echo "Codeberg head: ${UPSTREAM_HEAD}"
-
-          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" comparison
-          cd comparison
-          git checkout master
-          git checkout -B codeberg-upstream master
-
-          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          rsync -a --exclude='.git/' --exclude='.github/workflows/' ../upstream/ ./
-
-          if [ -d ../upstream/.github/workflows ]; then
-            mkdir -p .codeberg-import-workflows
-            cp -a ../upstream/.github/workflows/. .codeberg-import-workflows/
+          cd upstream
+          BASE=68d61ace1fa7872ba6914de6c2f610ce056007e4
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "TREE=$(git rev-parse HEAD^{tree})"
+          if git merge-base --is-ancestor "$BASE" HEAD; then
+            echo "BASE_IS_ANCESTOR=yes"
+            echo "COMMITS_SINCE_GITHUB=$(git rev-list --count ${BASE}..HEAD)"
+            echo "--- LOG SINCE GITHUB ---"
+            git log --date=short --pretty=format:'%h %ad %s' ${BASE}..HEAD
+            echo
+            echo "--- SHORTSTAT SINCE GITHUB ---"
+            git diff --shortstat ${BASE}..HEAD
+          else
+            echo "BASE_IS_ANCESTOR=no"
           fi
-
-          printf '%s\n' "${UPSTREAM_HEAD}" > .codeberg-upstream-head
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Snapshot Codeberg OpenBoE/oboe ${UPSTREAM_HEAD}"
-          git push --force origin codeberg-upstream
