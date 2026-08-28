@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Warm near-black backing for transparent portions of the original BOE icon. -->
+    <color name="ic_launcher_background">#241A13</color>
+</resources>
