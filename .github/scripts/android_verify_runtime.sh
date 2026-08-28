@@ -2,7 +2,6 @@
 set -euo pipefail
 
 PACKAGE="org.openboe.cboe.android"
-ACTIVITY="${PACKAGE}/android.app.NativeActivity"
 APK="android/app/build/outputs/apk/debug/app-debug.apk"
 
 capture_failure_diagnostics() {
@@ -17,6 +16,9 @@ trap capture_failure_diagnostics ERR
 
 adb install -r "$APK"
 adb logcat -c
+ACTIVITY=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE" | tail -n 1 | tr -d '\r')
+test -n "$ACTIVITY"
+echo "Resolved launcher: $ACTIVITY"
 adb shell am start -W -n "$ACTIVITY"
 
 # Require OpenBoE's real startup path, not Android's launch splash.
