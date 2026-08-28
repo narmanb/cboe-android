@@ -67,6 +67,21 @@ PY
   return 1
 }
 
+extract_tutorial_center() {
+  local log_file="$1"
+  local output_file="$2"
+  python3 - "$log_file" "$output_file" <<'PY'
+import re, sys
+log_file, output_file = sys.argv[1:]
+text = open(log_file, errors='replace').read()
+matches = re.findall(r'TUTORIAL_CENTER\s+(-?\d+)\s+(-?\d+)', text)
+if not matches:
+    raise SystemExit(1)
+with open(output_file, 'w') as out:
+    out.write(f"{matches[-1][0]} {matches[-1][1]}\n")
+PY
+}
+
 adb install -r "$APK"
 adb logcat -c
 launch_app verify-launch.txt
@@ -93,6 +108,12 @@ adb logcat -d -v threadtime > verify-title.log
 adb shell pidof "$PACKAGE" > verify-pid-before.txt
 test -s verify-pid-before.txt
 grep 'TUTORIAL_CENTER' verify-title.log | tail -n 5
+
+# Persist a known-good title coordinate while the verified landscape title is
+# definitely visible. Home/resume does not necessarily redraw the title, and a
+# busy emulator can rotate the older marker out of logcat before we tap it.
+extract_tutorial_center verify-title.log tutorial-center.txt
+test -s tutorial-center.txt
 adb exec-out screencap > verify-before.raw
 
 adb shell input keyevent KEYCODE_HOME
@@ -107,9 +128,15 @@ adb logcat -d -v threadtime > verify-after-resume.log
 adb exec-out screencap > verify-after.raw
 python3 .github/scripts/verify_android_resume.py verify-before.raw verify-after.raw
 
-# Refresh the title log and use coordinates produced after landscape resumed.
-adb logcat -d -v threadtime > verify-after-resume.log
-python3 -c "import re; t=open('verify-after-resume.log',errors='replace').read(); m=re.findall(r'TUTORIAL_CENTER\\s+(-?\\d+)\\s+(-?\\d+)',t); assert m, 'TUTORIAL_CENTER missing'; print(*m[-1])" > tutorial-center.txt
+# Prefer a freshly-emitted coordinate after resume when available. If the title
+# did not redraw (which is valid when the framebuffer and PID remained intact),
+# reuse the coordinate captured from the same verified landscape title layout.
+if extract_tutorial_center verify-after-resume.log tutorial-center-after-resume.txt; then
+  mv tutorial-center-after-resume.txt tutorial-center.txt
+else
+  echo "No fresh TUTORIAL_CENTER after resume; reusing the pre-resume landscape coordinate"
+fi
+
 test -s tutorial-center.txt
 read -r tutorial_x tutorial_y < tutorial-center.txt
 echo "Tapping Tutorial at ${tutorial_x},${tutorial_y}"
