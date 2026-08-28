@@ -47,13 +47,13 @@ if(V22_REGION_GAP_POS EQUAL -1)
 endif()
 string(REPLACE "${V22_REGION_GAP_OLD}" "${V22_REGION_GAP_NEW}" V22_WINUTIL "${V22_WINUTIL}")
 
-# Do not independently guess the ACT left edge anymore. Bind it directly to the
-# live minimap rectangle so the two outlines stay pixel-aligned on all devices.
+# Match ACT to the exact same divider formula used by the shifted minimap. Keep
+# this local because android_quick_geometry is compiled before android_map_mini_rect.
 set(V22_ACT_LEFT_OLD [=[        const float info_right = layout.info_column.left + layout.info_column.width;
         const float desired_left = info_right + 2.f;
         const float desired_right = dpad_panel.left + dpad_panel.width;]=])
-set(V22_ACT_LEFT_NEW [=[        const sf::FloatRect mini = android_map_mini_rect();
-        const float desired_left = mini.left;
+set(V22_ACT_LEFT_NEW [=[        const float desired_left =
+            layout.stats.screen.left + layout.stats.screen.width + 4.f;
         const float desired_right = dpad_panel.left + dpad_panel.width;]=])
 string(FIND "${V22_WINUTIL}" "${V22_ACT_LEFT_OLD}" V22_ACT_LEFT_POS)
 if(V22_ACT_LEFT_POS EQUAL -1)
