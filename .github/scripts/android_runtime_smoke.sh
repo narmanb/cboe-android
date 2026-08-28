@@ -7,8 +7,28 @@ APK="android/app/build/outputs/apk/debug/app-debug.apk"
 
 launch_app() {
   local log_file="$1"
+  local launch_status=0
+
+  # API-35 emulators occasionally return `Status: timeout` from `am start -W`
+  # even though the Activity process is alive and continuing to start normally.
+  # Let the real PID/title/frame/touch assertions below decide whether OpenBoE
+  # is healthy instead of failing solely on that Android shell timeout.
+  set +e
   adb shell am start -W -n "$ACTIVITY" 2>&1 | tee "$log_file"
-  grep -q 'Status: ok' "$log_file"
+  launch_status=${PIPESTATUS[0]}
+  set -e
+
+  if grep -q 'Status: ok' "$log_file"; then
+    return 0
+  fi
+
+  if adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
+    echo "am start -W returned status ${launch_status}, but OpenBoE is alive; continuing to runtime assertions"
+    return 0
+  fi
+
+  echo "OpenBoE launch failed before a live app process appeared"
+  return 1
 }
 
 # sensorLandscape can briefly return a portrait-sized surface after launch or
@@ -72,6 +92,8 @@ sleep 1
 adb shell pidof "$PACKAGE" > runtime-pid.txt || true
 test -s runtime-pid.txt
 adb logcat -d -v threadtime > runtime-logcat.txt
+python3 -c "import re; t=open('runtime-logcat.txt',errors='replace').read(); m=re.findall(r'TUTORIAL_CENTER\\s+(-?\\d+)\\s+(-?\\d+)',t); assert m, 'TUTORIAL_CENTER missing'; print(*m[-1])" > runtime-tutorial-center.txt
+test -s runtime-tutorial-center.txt
 adb exec-out screencap -p > runtime-before-resume.png
 adb exec-out screencap > runtime-before-resume.raw
 echo "Process PID: $(cat runtime-pid.txt)"
@@ -93,13 +115,23 @@ echo "Resume PID: $(cat runtime-resume-pid.txt)"
 grep -E -i 'OpenBoEAndroid|OpenBoE|sfml-activity|AndroidRuntime|FATAL|DEBUG|SIG(SEGV|ABRT)|cboe|libc|EGL' runtime-resume-logcat.txt | tail -n 300 || true
 python3 .github/scripts/verify_android_resume.py runtime-before-resume.raw runtime-after-resume.raw
 
-# Use coordinates emitted after the landscape surface has returned rather than
-# stale pre-Home coordinates from a different transient surface geometry.
-CENTER=$(grep 'TUTORIAL_CENTER' runtime-resume-logcat.txt | tail -n 1 | sed -E 's/.*TUTORIAL_CENTER ([0-9-]+) ([0-9-]+).*/\1 \2/')
-test -n "$CENTER"
-set -- $CENTER
-echo "Tapping Tutorial at $1,$2"
-adb shell input tap "$1" "$2"
+# Prefer coordinates emitted after landscape resume when available. OpenBoE
+# does not necessarily redraw the title screen on every resume, so fall back to
+# the already-validated pre-Home coordinates if no newer marker was logged.
+python3 - <<'PY'
+import re
+from pathlib import Path
+post = Path('runtime-resume-logcat.txt').read_text(errors='replace')
+matches = re.findall(r'TUTORIAL_CENTER\s+(-?\d+)\s+(-?\d+)', post)
+if matches:
+    x, y = matches[-1]
+else:
+    x, y = Path('runtime-tutorial-center.txt').read_text().split()[:2]
+Path('runtime-tutorial-center-active.txt').write_text(f'{x} {y}\n')
+PY
+read -r tutorial_x tutorial_y < runtime-tutorial-center-active.txt
+echo "Tapping Tutorial at ${tutorial_x},${tutorial_y}"
+adb shell input tap "$tutorial_x" "$tutorial_y"
 
 click_ready=0
 for i in $(seq 1 10); do
