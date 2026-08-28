@@ -1,6 +1,5 @@
 
 #include <string>
-#include <vector>
 #include <SFML/Graphics/RenderTarget.hpp>
 #include "location.hpp"
 #include "scenario/item.hpp"
@@ -9,17 +8,6 @@
 
 #ifndef BOE_NEWGRAPH_H
 #define BOE_NEWGRAPH_H
-
-// Compatibility bridge for the newer Codeberg boe.newgraph.cpp.
-// Upstream moved this layout vector out of reset_talk_words() in boe.dlgutil.cpp
-// so place_talk_str() can use it when shrinking overflowing conversation text.
-// Keep the Android dialog implementation otherwise untouched for this migration batch.
-inline std::vector<location> preset_word_locs = {
-	{4, 366}, {70, 366}, {136, 366},
-	{4, 389}, {70, 389}, {121, 389},
-	{210, 389}, {190, 366},
-	{4, 343}
-};
 
 struct word_rect_t {
 	std::string word;
