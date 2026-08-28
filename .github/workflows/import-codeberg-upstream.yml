@@ -17,16 +17,16 @@ jobs:
           set -euo pipefail
           git clone https://codeberg.org/OpenBoE/oboe.git upstream
           cd upstream
-          BASE=68d61ace1fa7872ba6914de6c2f610ce056007e4
+          BASE=89307b7acade066d5aba1607dda86a7e6281db96
           echo "HEAD=$(git rev-parse HEAD)"
           echo "TREE=$(git rev-parse HEAD^{tree})"
           if git merge-base --is-ancestor "$BASE" HEAD; then
             echo "BASE_IS_ANCESTOR=yes"
-            echo "COMMITS_SINCE_GITHUB=$(git rev-list --count ${BASE}..HEAD)"
-            echo "--- LOG SINCE GITHUB ---"
+            echo "COMMITS_SINCE_SHARED_BASE=$(git rev-list --count ${BASE}..HEAD)"
+            echo "--- LOG SINCE SHARED BASE ---"
             git log --date=short --pretty=format:'%h %ad %s' ${BASE}..HEAD
             echo
-            echo "--- SHORTSTAT SINCE GITHUB ---"
+            echo "--- SHORTSTAT SINCE SHARED BASE ---"
             git diff --shortstat ${BASE}..HEAD
           else
             echo "BASE_IS_ANCESTOR=no"
