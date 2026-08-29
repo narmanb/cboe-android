@@ -61,6 +61,20 @@ file(WRITE "${V26_WINUTIL_CPP}" "${V26_WINUTIL}")
 # that already works for dialog body text. Desktop behavior is untouched.
 # ---------------------------------------------------------------------------
 file(READ "${V26_BUTTON_CPP}" V26_BUTTON)
+
+# cButton did not previously need the UI-scale declaration. The Android-only
+# centering path below does, and winutil.hpp is where get_ui_scale() is exposed.
+set(V26_BUTTON_INCLUDE_OLD [=[#include "gfx/render_image.hpp"
+#include "gfx/render_text.hpp"]=])
+set(V26_BUTTON_INCLUDE_NEW [=[#include "gfx/render_image.hpp"
+#include "gfx/render_text.hpp"
+#include "tools/winutil.hpp"]=])
+string(FIND "${V26_BUTTON}" "${V26_BUTTON_INCLUDE_OLD}" V26_BUTTON_INCLUDE_POS)
+if(V26_BUTTON_INCLUDE_POS EQUAL -1)
+    message(FATAL_ERROR "v26 responsive: button render include block not found")
+endif()
+string(REPLACE "${V26_BUTTON_INCLUDE_OLD}" "${V26_BUTTON_INCLUDE_NEW}" V26_BUTTON "${V26_BUTTON}")
+
 set(V26_BUTTON_LINEHEIGHT_OLD [=[		style.colour = sf::Color::Black;
 		style.lineHeight = 8;
 		eTextMode textMode = eTextMode::CENTRE;]=])
