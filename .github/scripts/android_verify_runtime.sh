@@ -83,6 +83,14 @@ PY
 }
 
 adb install -r "$APK"
+
+# A fresh API-35 emulator can cover the app with Android's one-time immersive
+# mode confirmation. The failure artifact from the previous strict run showed
+# that system overlay instead of OpenBoE, so the adb Tutorial tap never reached
+# the game even though the app itself was alive underneath. Match the runtime
+# smoke test and acknowledge the emulator-only confirmation before launch.
+adb shell settings put secure immersive_mode_confirmations confirmed >/dev/null 2>&1 || true
+
 adb logcat -c
 launch_app verify-launch.txt
 
