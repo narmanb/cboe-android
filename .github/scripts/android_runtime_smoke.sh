@@ -149,11 +149,9 @@ fi
 
 grep 'STARTUP_BUTTON_CLICK' runtime-after-tap-logcat.txt | tail -n 5
 
-# Probe a fitted modal at the same 1920x1080 emulator resolution used above.
-# The two title-button columns are adjacent equal-width rectangles, so the
-# Make New Party center is exactly three times the Tutorial center's X value.
-# Capture the resulting dialog so responsive button-label regressions are
-# visible in CI artifacts instead of requiring a physical-device round trip.
+# Probe a fitted modal at the same landscape emulator resolution. The two title
+# button columns are adjacent equal-width rectangles, so the Make New Party
+# center is exactly three times the Tutorial center's X value.
 adb shell am force-stop "$PACKAGE"
 sleep 1
 adb logcat -c
@@ -184,18 +182,52 @@ adb shell input tap "$new_party_x" "$new_party_y"
 new_party_clicked=0
 for i in $(seq 1 10); do
   adb logcat -d -v threadtime > runtime-dialog-logcat.txt
-  if grep -q 'STARTUP_BUTTON_CLICK' runtime-dialog-logcat.txt; then
+  if grep -q 'DIALOG_CONTROL_CENTER' runtime-dialog-logcat.txt; then
     new_party_clicked=1
     break
   fi
   sleep 1
 done
 if [[ "$new_party_clicked" != "1" ]]; then
-  echo "Make New Party tap was not received"
+  echo "Make New Party did not open a clickable modal"
   exit 1
 fi
-sleep 2
+sleep 1
 adb exec-out screencap -p > runtime-new-party-dialog.png
 test -s runtime-new-party-dialog.png
+
+# The Retroid regression was specifically press-success/release-failure. Use the
+# exact physical center emitted by the fitted dialog renderer, tap Cancel, and
+# require the control's click handler to dispatch after MouseButtonReleased.
+adb logcat -d -v threadtime > runtime-dialog-logcat.txt
+python3 - <<'PY'
+import re
+from pathlib import Path
+text = Path('runtime-dialog-logcat.txt').read_text(errors='replace')
+matches = re.findall(r'DIALOG_CONTROL_CENTER\s+.*?\s+cancel\s+(-?\d+)\s+(-?\d+)', text)
+assert matches, 'Cancel control center missing from fitted dialog log'
+x, y = matches[-1]
+Path('runtime-dialog-cancel-center.txt').write_text(f'{x} {y}\n')
+PY
+read -r cancel_x cancel_y < runtime-dialog-cancel-center.txt
+echo "Tapping fitted dialog Cancel at ${cancel_x},${cancel_y}"
+adb shell input tap "$cancel_x" "$cancel_y"
+
+cancel_clicked=0
+for i in $(seq 1 10); do
+  adb logcat -d -v threadtime > runtime-dialog-after-cancel-logcat.txt
+  if grep -q 'DIALOG_CONTROL_CLICK cancel' runtime-dialog-after-cancel-logcat.txt; then
+    cancel_clicked=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$cancel_clicked" != "1" ]]; then
+  echo "Fitted dialog Cancel press did not survive MouseButtonReleased mapping"
+  exit 1
+fi
+adb exec-out screencap -p > runtime-new-party-after-cancel.png
+test -s runtime-new-party-after-cancel.png
+grep 'DIALOG_CONTROL_CLICK cancel' runtime-dialog-after-cancel-logcat.txt | tail -n 3
 
 echo "Android runtime smoke passed"
