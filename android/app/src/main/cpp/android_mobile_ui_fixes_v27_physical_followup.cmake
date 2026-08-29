@@ -1,7 +1,7 @@
 # Android physical-device responsive follow-up after v26.
 # - Keep touch controls sized from display height so 16:9 devices do not shrink them merely because they are narrower.
 # - Reset the main RenderWindow view before redrawing beneath Android dialogs to avoid one-frame stale-view corruption.
-# - Draw centered Android button labels directly in the active dialog view and undo the legacy BTN_PUSH caption offset.
+# - Draw centered Android button labels directly in the active dialog view and remove the desktop BTN_PUSH caption offset.
 if(DEFINED CBOE_ANDROID_MOBILE_UI_FIXES_V27_APPLIED)
     return()
 endif()
@@ -25,19 +25,16 @@ set(V27_DPAD_OLD [=[    const float reference_scale = android_reference_scale();
     const float vertical_padding = 18.f * reference_scale;
 
     float button_size = 114.f * reference_scale;
-    if(button_size > 114.f) button_size = 114.f;
-    if(button_size < 42.f) button_size = 42.f;]=])
+    button_size = std::max(42.f, std::min(114.f, button_size));]=])
 set(V27_DPAD_NEW [=[    const float reference_scale = android_reference_scale();
     float control_scale = static_cast<float>(window_size.y) / 1080.f;
-    if(control_scale > 1.f) control_scale = 1.f;
-    if(control_scale < 0.65f) control_scale = 0.65f;
+    control_scale = std::max(0.65f, std::min(1.f, control_scale));
     const float gap = 10.f * control_scale;
     const float right_padding = 128.f * control_scale;
     const float vertical_padding = 18.f * control_scale;
 
     float button_size = 114.f * control_scale;
-    if(button_size > 114.f) button_size = 114.f;
-    if(button_size < 42.f) button_size = 42.f;]=])
+    button_size = std::max(42.f, std::min(114.f, button_size));]=])
 string(FIND "${V27_WINUTIL}" "${V27_DPAD_OLD}" V27_DPAD_POS)
 if(V27_DPAD_POS EQUAL -1)
     message(FATAL_ERROR "v27: expected v25 responsive D-pad sizing block not found")
@@ -64,10 +61,19 @@ string(REPLACE "${V27_DIALOG_EXTERN_OLD}" "${V27_DIALOG_EXTERN_NEW}" V27_DIALOG 
 
 set(V27_DIALOG_DRAW_START_OLD [=[#ifdef __ANDROID__
 	sf::RenderWindow& target = mainPtr();
+
+	// Draw the normal game/title screen and every parent dialog into one back
+	// buffer, then present only after the frontmost dialog has been composited.
 	android_suppress_main_present = true;]=])
 set(V27_DIALOG_DRAW_START_NEW [=[#ifdef __ANDROID__
 	sf::RenderWindow& target = mainPtr();
+
+	// Always redraw the underlying game/title in its normal view. A previous
+	// dialog may have left mainPtr() using a fitted modal viewport.
 	target.setView(mainView);
+
+	// Draw the normal game/title screen and every parent dialog into one back
+	// buffer, then present only after the frontmost dialog has been composited.
 	android_suppress_main_present = true;]=])
 string(FIND "${V27_DIALOG}" "${V27_DIALOG_DRAW_START_OLD}" V27_DIALOG_DRAW_START_POS)
 if(V27_DIALOG_DRAW_START_POS EQUAL -1)
@@ -75,12 +81,13 @@ if(V27_DIALOG_DRAW_START_POS EQUAL -1)
 endif()
 string(REPLACE "${V27_DIALOG_DRAW_START_OLD}" "${V27_DIALOG_DRAW_START_NEW}" V27_DIALOG "${V27_DIALOG}")
 
-set(V27_DIALOG_DRAW_END_OLD [=[	target.display();
-	return;
+set(V27_DIALOG_DRAW_END_OLD [=[	target.setActive(true);
+	target.display();
 #else]=])
-set(V27_DIALOG_DRAW_END_NEW [=[	target.display();
+set(V27_DIALOG_DRAW_END_NEW [=[	target.setActive(true);
+	target.display();
+	// Do not leak a dialog-local view into the next game/title redraw.
 	target.setView(mainView);
-	return;
 #else]=])
 string(FIND "${V27_DIALOG}" "${V27_DIALOG_DRAW_END_OLD}" V27_DIALOG_DRAW_END_POS)
 if(V27_DIALOG_DRAW_END_POS EQUAL -1)
@@ -90,52 +97,78 @@ string(REPLACE "${V27_DIALOG_DRAW_END_OLD}" "${V27_DIALOG_DRAW_END_NEW}" V27_DIA
 file(WRITE "${CBOE_ANDROID_V27_DIALOG_CPP}" "${V27_DIALOG}")
 
 # ---------------------------------------------------------------------------
-# button.cpp: centered button text should share the exact same dialog view as
-# the button artwork. The v26 path temporarily converted it to physical/default
-# view coordinates, which still diverges on fitted dialogs. Also compensate the
-# desktop BTN_PUSH convention that moves its caption 42 logical pixels below the
-# icon; on Android these controls are rendered as touch buttons and need their
-# captions centered inside the visible button frame.
+# button.cpp: BTN_PUSH has a desktop convention that places its caption 42
+# logical pixels beneath the icon. Android renders these controls inline in a
+# fitted modal, so that offset can move the label outside the visible button.
+# Keep it on desktop only.
 # ---------------------------------------------------------------------------
 file(READ "${CBOE_ANDROID_V27_BUTTON_CPP}" V27_BUTTON)
-set(V27_BUTTON_OLD [=[#ifdef __ANDROID__
-				if(textMode == eTextMode::CENTRE) {
-					sf::Text logical_text;
-					style.applyTo(logical_text);
-					logical_text.setString(label);
-					sf::FloatRect logical_bounds = logical_text.getLocalBounds();
-					sf::Vector2f logical_position(
-						(static_cast<float>(to_rect.left + to_rect.right) - logical_bounds.width) * 0.5f - logical_bounds.left,
-						(static_cast<float>(to_rect.top + to_rect.bottom) - logical_bounds.height) * 0.5f - logical_bounds.top
-					);
+set(V27_PUSH_OLD [=[		} else if(type == BTN_PUSH) {
+			to_rect.top += 42;
+			style.colour = textClr;
+			int w = string_length(getText(), style);
+			to_rect.inset((w - 30) / -2,0);
+		}]=])
+set(V27_PUSH_NEW [=[		} else if(type == BTN_PUSH) {
+			style.colour = textClr;
+#ifndef __ANDROID__
+			to_rect.top += 42;
+			int w = string_length(getText(), style);
+			to_rect.inset((w - 30) / -2,0);
+#endif
+		}]=])
+string(FIND "${V27_BUTTON}" "${V27_PUSH_OLD}" V27_PUSH_POS)
+if(V27_PUSH_POS EQUAL -1)
+    message(FATAL_ERROR "v27: expected BTN_PUSH caption-offset block not found")
+endif()
+string(REPLACE "${V27_PUSH_OLD}" "${V27_PUSH_NEW}" V27_BUTTON "${V27_BUTTON}")
 
-					sf::Text draw_text;
-					style.applyTo(draw_text, static_cast<float>(get_ui_scale()));
-					draw_text.setString(label);
-					draw_text.setPosition(logical_position);
-					draw_scale_aware_text(getWindow(), draw_text);
-					return;
-				}
+# Center Android labels in the active dialog's own logical view. This makes the
+# label and button artwork undergo the identical modal fit transform, instead of
+# converting the label through the default physical RenderWindow view again.
+set(V27_BUTTON_OLD [=[#ifdef __ANDROID__
+			if(textMode == eTextMode::CENTRE) {
+				sf::Text logical_text;
+				style.applyTo(logical_text);
+				logical_text.setString(sf::String::fromUtf8(line.begin(), line.end()));
+				const sf::FloatRect glyph_bounds = logical_text.getLocalBounds();
+
+				sf::Text draw_text;
+				style.applyTo(draw_text, get_ui_scale());
+				draw_text.setString(sf::String::fromUtf8(line.begin(), line.end()));
+				const float x = static_cast<float>(to_rect.left) +
+					(static_cast<float>(to_rect.width()) - glyph_bounds.width) * 0.5f -
+					glyph_bounds.left;
+				const float y = static_cast<float>(to_rect.top) +
+					(static_cast<float>(to_rect.height()) - glyph_bounds.height) * 0.5f -
+					glyph_bounds.top;
+				draw_text.setPosition(x, y);
+				draw_scale_aware_text(getWindow(), draw_text);
+			} else {
+				win_draw_string(getWindow(),to_rect,line,textMode,style);
+			}
+#else
+			win_draw_string(getWindow(),to_rect,line,textMode,style);
 #endif]=])
 set(V27_BUTTON_NEW [=[#ifdef __ANDROID__
-				if(textMode == eTextMode::CENTRE) {
-					rectangle android_center_rect = to_rect;
-					if(type == BTN_PUSH) {
-						android_center_rect.top -= 42;
-						android_center_rect.bottom -= 42;
-					}
-
-					sf::Text draw_text;
-					style.applyTo(draw_text);
-					draw_text.setString(label);
-					sf::FloatRect logical_bounds = draw_text.getLocalBounds();
-					draw_text.setPosition(
-						(static_cast<float>(android_center_rect.left + android_center_rect.right) - logical_bounds.width) * 0.5f - logical_bounds.left,
-						(static_cast<float>(android_center_rect.top + android_center_rect.bottom) - logical_bounds.height) * 0.5f - logical_bounds.top
-					);
-					getWindow().draw(draw_text);
-					return;
-				}
+			if(textMode == eTextMode::CENTRE) {
+				sf::Text draw_text;
+				style.applyTo(draw_text);
+				draw_text.setString(sf::String::fromUtf8(line.begin(), line.end()));
+				const sf::FloatRect glyph_bounds = draw_text.getLocalBounds();
+				const float x = static_cast<float>(to_rect.left) +
+					(static_cast<float>(to_rect.width()) - glyph_bounds.width) * 0.5f -
+					glyph_bounds.left;
+				const float y = static_cast<float>(to_rect.top) +
+					(static_cast<float>(to_rect.height()) - glyph_bounds.height) * 0.5f -
+					glyph_bounds.top;
+				draw_text.setPosition(x, y);
+				getWindow().draw(draw_text);
+			} else {
+				win_draw_string(getWindow(),to_rect,line,textMode,style);
+			}
+#else
+			win_draw_string(getWindow(),to_rect,line,textMode,style);
 #endif]=])
 string(FIND "${V27_BUTTON}" "${V27_BUTTON_OLD}" V27_BUTTON_POS)
 if(V27_BUTTON_POS EQUAL -1)
