@@ -149,9 +149,9 @@ fi
 
 grep 'STARTUP_BUTTON_CLICK' runtime-after-tap-logcat.txt | tail -n 5
 
-# Probe a fitted modal at the same landscape emulator resolution. The two title
-# button columns are adjacent equal-width rectangles, so the Make New Party
-# center is exactly three times the Tutorial center's X value.
+# Probe a fitted modal at the same landscape emulator resolution. Responsive
+# title geometry changes with aspect ratio, so use OpenBoE's emitted physical
+# Make New Party center rather than inferring it from the Tutorial rectangle.
 adb shell am force-stop "$PACKAGE"
 sleep 1
 adb logcat -c
@@ -161,7 +161,7 @@ dialog_title_ready=0
 for i in $(seq 1 35); do
   if adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
     adb logcat -d -v threadtime > runtime-dialog-logcat.txt
-    if grep -q 'TUTORIAL_CENTER' runtime-dialog-logcat.txt; then
+    if grep -q 'STARTUP_NEW_CENTER' runtime-dialog-logcat.txt; then
       dialog_title_ready=1
       break
     fi
@@ -169,12 +169,13 @@ for i in $(seq 1 35); do
   sleep 1
 done
 if [[ "$dialog_title_ready" != "1" ]]; then
-  echo "OpenBoE dialog probe did not reach draw_startup"
+  echo "OpenBoE dialog probe did not emit the Make New Party center"
   exit 1
 fi
 wait_for_landscape runtime-dialog-orientation.raw
 sleep 2
-python3 -c "import re; t=open('runtime-dialog-logcat.txt',errors='replace').read(); m=re.findall(r'TUTORIAL_CENTER\\s+(-?\\d+)\\s+(-?\\d+)',t); assert m, 'TUTORIAL_CENTER missing'; x,y=m[-1]; print(int(x)*3, y)" > runtime-new-party-center.txt
+adb logcat -d -v threadtime > runtime-dialog-logcat.txt
+python3 -c "import re; t=open('runtime-dialog-logcat.txt',errors='replace').read(); m=re.findall(r'STARTUP_NEW_CENTER\\s+(-?\\d+)\\s+(-?\\d+)',t); assert m, 'STARTUP_NEW_CENTER missing'; print(*m[-1])" > runtime-new-party-center.txt
 read -r new_party_x new_party_y < runtime-new-party-center.txt
 echo "Tapping Make New Party at ${new_party_x},${new_party_y}"
 adb shell input tap "$new_party_x" "$new_party_y"
