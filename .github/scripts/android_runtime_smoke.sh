@@ -148,4 +148,54 @@ if [[ "$click_ready" != "1" ]]; then
 fi
 
 grep 'STARTUP_BUTTON_CLICK' runtime-after-tap-logcat.txt | tail -n 5
+
+# Probe a fitted modal at the same 1920x1080 emulator resolution used above.
+# The two title-button columns are adjacent equal-width rectangles, so the
+# Make New Party center is exactly three times the Tutorial center's X value.
+# Capture the resulting dialog so responsive button-label regressions are
+# visible in CI artifacts instead of requiring a physical-device round trip.
+adb shell am force-stop "$PACKAGE"
+sleep 1
+adb logcat -c
+launch_app runtime-dialog-launch.txt
+
+dialog_title_ready=0
+for i in $(seq 1 35); do
+  if adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
+    adb logcat -d -v threadtime > runtime-dialog-logcat.txt
+    if grep -q 'TUTORIAL_CENTER' runtime-dialog-logcat.txt; then
+      dialog_title_ready=1
+      break
+    fi
+  fi
+  sleep 1
+done
+if [[ "$dialog_title_ready" != "1" ]]; then
+  echo "OpenBoE dialog probe did not reach draw_startup"
+  exit 1
+fi
+wait_for_landscape runtime-dialog-orientation.raw
+sleep 2
+python3 -c "import re; t=open('runtime-dialog-logcat.txt',errors='replace').read(); m=re.findall(r'TUTORIAL_CENTER\\s+(-?\\d+)\\s+(-?\\d+)',t); assert m, 'TUTORIAL_CENTER missing'; x,y=m[-1]; print(int(x)*3, y)" > runtime-new-party-center.txt
+read -r new_party_x new_party_y < runtime-new-party-center.txt
+echo "Tapping Make New Party at ${new_party_x},${new_party_y}"
+adb shell input tap "$new_party_x" "$new_party_y"
+
+new_party_clicked=0
+for i in $(seq 1 10); do
+  adb logcat -d -v threadtime > runtime-dialog-logcat.txt
+  if grep -q 'STARTUP_BUTTON_CLICK' runtime-dialog-logcat.txt; then
+    new_party_clicked=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$new_party_clicked" != "1" ]]; then
+  echo "Make New Party tap was not received"
+  exit 1
+fi
+sleep 2
+adb exec-out screencap -p > runtime-new-party-dialog.png
+test -s runtime-new-party-dialog.png
+
 echo "Android runtime smoke passed"
