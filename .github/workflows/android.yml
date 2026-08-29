@@ -99,8 +99,8 @@ jobs:
           if-no-files-found: error
 
   # Build an x86_64 copy inside CI and launch it in an Android emulator.
-  # This verifies process survival, the visible Home/resume result, and a real
-  # Android touchscreen tap reaching OpenBoE's startup-button handler.
+  # This verifies process survival, the visible Home/resume result, and real
+  # Android touchscreen taps through title and fitted-dialog controls.
   runtime-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -186,7 +186,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Launch, verify resume, and tap title button
+      - name: Launch, verify resume, and tap title/dialog buttons
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -208,13 +208,16 @@ jobs:
             runtime-resume-logcat.txt
             runtime-after-tap-logcat.txt
             runtime-dialog-logcat.txt
+            runtime-dialog-after-cancel-logcat.txt
             runtime-before-resume.png
             runtime-after-resume.png
             runtime-new-party-dialog.png
+            runtime-new-party-after-cancel.png
             runtime-before-resume.raw
             runtime-after-resume.raw
             runtime-launch.txt
             runtime-resume-launch.txt
             runtime-dialog-launch.txt
+            runtime-dialog-cancel-center.txt
             android-emulator-build.log
           if-no-files-found: warn
