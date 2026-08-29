@@ -160,7 +160,7 @@ void cOutdoors::cWandering::import_legacy(legacy::out_wandering_type old){
 
 void cOutdoors::cCreature::import_legacy(legacy::outdoor_creature_type old){
 	exists = old.exists;
-	direction = old.direction;
+	direction = eDirection(old.direction);
 	what_monst.import_legacy(old.what_monst);
 	which_sector.x = old.which_sector.x;
 	which_sector.y = old.which_sector.y;
