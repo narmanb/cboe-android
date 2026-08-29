@@ -34,6 +34,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v25_responsive.cmake"
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v26_responsive_followup.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v27_physical_followup.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v28_dialog_touch_release.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v29_full_height.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_codeberg_fixes_v25.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_codeberg_fixes_v26.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_codeberg_fixes_v27.cmake")
