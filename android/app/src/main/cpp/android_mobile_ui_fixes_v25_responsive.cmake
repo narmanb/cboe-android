@@ -1,7 +1,7 @@
 # Android responsive-layout pass v25.
 # Generalize the phone-tuned composition onto other landscape displays by using
-# the Galaxy-phone layout as a reference canvas and scaling it uniformly to fit.
-# Also make scale-aware dialog text honor the dialog view's actual fit scale.
+# the current phone layout as a reference canvas and scaling its geometry as a
+# coherent system. Also make scale-aware dialog text honor the fitted dialog view.
 if(DEFINED CBOE_ANDROID_MOBILE_UI_FIXES_V25_RESPONSIVE_APPLIED)
     return()
 endif()
@@ -13,9 +13,8 @@ set(V25_RENDER_TEXT_CPP "${CBOE_ANDROID_UI_V25_ROOT}/src/gfx/render_text.cpp")
 
 file(READ "${V25_WINUTIL_CPP}" V25_WINUTIL)
 
-# Treat the current phone composition as a 2340x1080 reference canvas. Devices
-# with a different aspect ratio get one uniform scale, preserving the established
-# proportions instead of letting fixed physical-pixel minimums dominate.
+# The established phone composition is our reference. Scale by whichever axis is
+# tighter so controls never run off-screen; centre the resulting logical canvas.
 set(V25_SCALE_ANCHOR [=[// Android touch controls intentionally live in physical screen coordinates,
 // not OpenBoE's scaled desktop View.
 bool android_dpad_geometry]=])
@@ -37,8 +36,7 @@ if(V25_SCALE_POS EQUAL -1)
 endif()
 string(REPLACE "${V25_SCALE_ANCHOR}" "${V25_SCALE_INSERT}" V25_WINUTIL "${V25_WINUTIL}")
 
-# Scale D-pad dimensions from the reference phone instead of imposing the same
-# 78-114 physical-pixel buttons and 128px edge inset on every device.
+# D-pad: replace final post-v15 fixed pixels with reference-scaled values.
 set(V25_DPAD_OLD [=[    const float gap = 10.f;
     const float right_padding = 128.f;
     const float vertical_padding = 18.f;
@@ -55,13 +53,12 @@ set(V25_DPAD_NEW [=[    const float reference_scale = android_reference_scale();
     button_size = std::max(42.f, std::min(114.f, button_size));]=])
 string(FIND "${V25_WINUTIL}" "${V25_DPAD_OLD}" V25_DPAD_POS)
 if(V25_DPAD_POS EQUAL -1)
-    message(FATAL_ERROR "v25 responsive: final v15 d-pad sizing block not found")
+    message(FATAL_ERROR "v25 responsive: final d-pad sizing block not found")
 endif()
 string(REPLACE "${V25_DPAD_OLD}" "${V25_DPAD_NEW}" V25_WINUTIL "${V25_WINUTIL}")
 
-# Scale the entire terrain/info composition as one reference layout. On a 16:9
-# display width becomes the limiting dimension, so the established phone layout
-# gets slightly letterboxed vertically rather than crushing the info stack.
+# Main terrain + information stack: scale the current 2340x1080 composition as
+# one canvas instead of separately enforcing phone-sized physical minima.
 set(V25_LAYOUT_HEAD_OLD [=[    const float h = static_cast<float>(size.y);
     const float margin = 8.f;
     const float gap = 6.f;
@@ -97,16 +94,7 @@ if(V25_TERRAIN_POS EQUAL -1)
 endif()
 string(REPLACE "${V25_TERRAIN_OLD}" "${V25_TERRAIN_NEW}" V25_WINUTIL "${V25_WINUTIL}")
 
-set(V25_INFO_MIN_OLD [=[    if(info_width < 260.f)
-        return false;]=])
-set(V25_INFO_MIN_NEW [=[    if(info_width < 260.f * reference_scale)
-        return false;]=])
-string(FIND "${V25_WINUTIL}" "${V25_INFO_MIN_OLD}" V25_INFO_MIN_POS)
-if(V25_INFO_MIN_POS EQUAL -1)
-    message(FATAL_ERROR "v25 responsive: info-column minimum not found")
-endif()
-string(REPLACE "${V25_INFO_MIN_OLD}" "${V25_INFO_MIN_NEW}" V25_WINUTIL "${V25_WINUTIL}")
-
+string(REPLACE "if(info_width < 260.f)" "if(info_width < 260.f * reference_scale)" V25_WINUTIL "${V25_WINUTIL}")
 set(V25_INFO_BOTTOM_OLD [=[    const float info_bottom = h - margin;
     const float info_height = info_bottom - margin;]=])
 set(V25_INFO_BOTTOM_NEW [=[    const float info_bottom = content_top + content_h - margin;
@@ -116,7 +104,6 @@ if(V25_INFO_BOTTOM_POS EQUAL -1)
     message(FATAL_ERROR "v25 responsive: info-column vertical bounds not found")
 endif()
 string(REPLACE "${V25_INFO_BOTTOM_OLD}" "${V25_INFO_BOTTOM_NEW}" V25_WINUTIL "${V25_WINUTIL}")
-
 set(V25_PANEL_TOP_OLD [=[    if(panel_width < 240.f)
         return false;
 
@@ -130,138 +117,86 @@ if(V25_PANEL_TOP_POS EQUAL -1)
     message(FATAL_ERROR "v25 responsive: panel top/minimum block not found")
 endif()
 string(REPLACE "${V25_PANEL_TOP_OLD}" "${V25_PANEL_TOP_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "layout.info_column = {info_left, margin, panel_width, info_height};"
+               "layout.info_column = {info_left, content_top + margin, panel_width, info_height};"
+               V25_WINUTIL "${V25_WINUTIL}")
 
-set(V25_INFO_COLUMN_OLD [=[    layout.info_column = {info_left, margin, panel_width, info_height};]=])
-set(V25_INFO_COLUMN_NEW [=[    layout.info_column = {info_left, content_top + margin, panel_width, info_height};]=])
-string(FIND "${V25_WINUTIL}" "${V25_INFO_COLUMN_OLD}" V25_INFO_COLUMN_POS)
-if(V25_INFO_COLUMN_POS EQUAL -1)
-    message(FATAL_ERROR "v25 responsive: info-column output not found")
-endif()
-string(REPLACE "${V25_INFO_COLUMN_OLD}" "${V25_INFO_COLUMN_NEW}" V25_WINUTIL "${V25_WINUTIL}")
-
-# Scale the live minimap's spacing and minimum size with the same reference
-# factor so 16:9 devices do not fall into the large fixed-pixel fallback.
-set(V25_MINIMAP_OLD [=[sf::FloatRect android_map_mini_rect() {
-    const sf::Vector2u size = mainPtr().getSize();
-    AndroidMobileLayout layout;
-    std::array<AndroidDpadButton, 8> dpad_buttons;
-    sf::FloatRect dpad_panel;
-    if(android_mobile_layout(layout) && android_dpad_geometry(dpad_buttons, &dpad_panel)) {
-        const float top = 14.f;
-        const float info_gap = 8.f;
+# Final post-v23 live-minimap geometry. Patch small stable fragments instead of
+# replacing the entire function; later UI-polish passes deliberately changed its
+# divider from the older v16 value that caused the previous CI anchor failure.
+set(V25_MINI_HEAD_OLD [=[        const float top = 14.f;
+        const float info_gap = 10.f;
         const float menu_lane = 60.f;
-        const float lane_gap = 8.f;
-        const float left = layout.stats.screen.left + layout.stats.screen.width + info_gap;
-        const float right = dpad_panel.left + dpad_panel.width - menu_lane - lane_gap;
-        const float width_limit = right - left;
-        const float height_limit = dpad_panel.top - top - 12.f;
-        const float mini = std::min(width_limit, height_limit);
-        if(mini >= 145.f)
-            return {left, top, mini, mini};
-    }
-
-    // Defensive fallback for unusually small/odd displays.
-    float mini = static_cast<float>(size.y) * 0.26f;
+        const float lane_gap = 8.f;]=])
+set(V25_MINI_HEAD_NEW [=[        const float scale = android_reference_scale();
+        const float top = std::max(6.f, 14.f * scale);
+        const float info_gap = 10.f * scale;
+        const float menu_lane = 60.f * scale;
+        const float lane_gap = 8.f * scale;]=])
+string(FIND "${V25_WINUTIL}" "${V25_MINI_HEAD_OLD}" V25_MINI_HEAD_POS)
+if(V25_MINI_HEAD_POS EQUAL -1)
+    message(FATAL_ERROR "v25 responsive: final minimap geometry header not found")
+endif()
+string(REPLACE "${V25_MINI_HEAD_OLD}" "${V25_MINI_HEAD_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "const float height_limit = dpad_panel.top - top - 12.f;"
+               "const float height_limit = dpad_panel.top - top - 12.f * scale;"
+               V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "if(mini >= 145.f)" "if(mini >= 145.f * scale)" V25_WINUTIL "${V25_WINUTIL}")
+set(V25_MINI_FALLBACK_OLD [=[    float mini = static_cast<float>(size.y) * 0.26f;
     if(mini > 190.f) mini = 190.f;
     if(mini < 145.f) mini = 145.f;
-    return {static_cast<float>(size.x) - mini - 20.f, 18.f, mini, mini};
-}]=])
-set(V25_MINIMAP_NEW [=[sf::FloatRect android_map_mini_rect() {
-    const sf::Vector2u size = mainPtr().getSize();
-    const float scale = android_reference_scale();
-    AndroidMobileLayout layout;
-    std::array<AndroidDpadButton, 8> dpad_buttons;
-    sf::FloatRect dpad_panel;
-    if(android_mobile_layout(layout) && android_dpad_geometry(dpad_buttons, &dpad_panel)) {
-        const float top = std::max(6.f, 14.f * scale);
-        const float info_gap = 8.f * scale;
-        const float menu_lane = 60.f * scale;
-        const float lane_gap = 8.f * scale;
-        const float left = layout.stats.screen.left + layout.stats.screen.width + info_gap;
-        const float right = dpad_panel.left + dpad_panel.width - menu_lane - lane_gap;
-        const float width_limit = right - left;
-        const float height_limit = dpad_panel.top - top - 12.f * scale;
-        const float mini = std::min(width_limit, height_limit);
-        if(mini >= 145.f * scale)
-            return {left, top, mini, mini};
-    }
-
+    return {static_cast<float>(size.x) - mini - 20.f, 18.f, mini, mini};]=])
+set(V25_MINI_FALLBACK_NEW [=[    const float fallback_scale = android_reference_scale();
     float mini = static_cast<float>(size.y) * 0.26f;
-    mini = std::min(190.f * scale, std::max(96.f, mini));
-    return {static_cast<float>(size.x) - mini - 20.f * scale,
-            std::max(6.f, 18.f * scale), mini, mini};
-}]=])
-string(FIND "${V25_WINUTIL}" "${V25_MINIMAP_OLD}" V25_MINIMAP_POS)
-if(V25_MINIMAP_POS EQUAL -1)
-    message(FATAL_ERROR "v25 responsive: final v16 minimap geometry not found")
+    mini = std::min(190.f * fallback_scale, std::max(96.f, mini));
+    return {static_cast<float>(size.x) - mini - 20.f * fallback_scale,
+            std::max(6.f, 18.f * fallback_scale), mini, mini};]=])
+string(FIND "${V25_WINUTIL}" "${V25_MINI_FALLBACK_OLD}" V25_MINI_FALLBACK_POS)
+if(V25_MINI_FALLBACK_POS EQUAL -1)
+    message(FATAL_ERROR "v25 responsive: final minimap fallback not found")
 endif()
-string(REPLACE "${V25_MINIMAP_OLD}" "${V25_MINIMAP_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "${V25_MINI_FALLBACK_OLD}" "${V25_MINI_FALLBACK_NEW}" V25_WINUTIL "${V25_WINUTIL}")
 
-# The ACT/MENU gap is also reference-scaled. Fixed 145/190px thresholds were
-# the reason the Retroid-class layout abandoned this region entirely.
-set(V25_CONTROL_REGION_OLD [=[bool android_action_controls_region(sf::FloatRect& region) {
-    AndroidMobileLayout layout;
-    std::array<AndroidDpadButton, 8> dpad_buttons;
-    sf::FloatRect dpad_panel;
-    if(!android_mobile_layout(layout) || !android_dpad_geometry(dpad_buttons, &dpad_panel))
-        return false;
-
-    const float mini_top = 14.f;
-    const float info_gap = 8.f;
-    const float menu_lane = 60.f;
-    const float lane_gap = 8.f;
-    const float mini_left = layout.stats.screen.left + layout.stats.screen.width + info_gap;
-    const float mini_right = dpad_panel.left + dpad_panel.width - menu_lane - lane_gap;
-    const float width_limit = mini_right - mini_left;
-    const float height_limit = dpad_panel.top - mini_top - 12.f;
-    const float mini_size = std::min(width_limit, height_limit);
-    if(mini_size < 145.f)
-        return false;
-
-    const float controls_top = mini_top + mini_size + 14.f;
-    const float controls_bottom = dpad_panel.top - 12.f;
-    if(controls_bottom - controls_top < 190.f)
-        return false;
-
-    region = {dpad_panel.left, controls_top, dpad_panel.width,
-              controls_bottom - controls_top};
-    return true;
-}]=])
-set(V25_CONTROL_REGION_NEW [=[bool android_action_controls_region(sf::FloatRect& region) {
+# ACT/MENU region after v19/v23: v19 reduced the final height guard to 108px,
+# and v23 moved the shared divider to a 10px logical gap.
+set(V25_REGION_HEAD_OLD [=[bool android_action_controls_region(sf::FloatRect& region) {
+    AndroidMobileLayout layout;]=])
+set(V25_REGION_HEAD_NEW [=[bool android_action_controls_region(sf::FloatRect& region) {
     const float scale = android_reference_scale();
-    AndroidMobileLayout layout;
-    std::array<AndroidDpadButton, 8> dpad_buttons;
-    sf::FloatRect dpad_panel;
-    if(!android_mobile_layout(layout) || !android_dpad_geometry(dpad_buttons, &dpad_panel))
-        return false;
-
-    const float mini_top = std::max(6.f, 14.f * scale);
-    const float info_gap = 8.f * scale;
-    const float menu_lane = 60.f * scale;
-    const float lane_gap = 8.f * scale;
-    const float mini_left = layout.stats.screen.left + layout.stats.screen.width + info_gap;
-    const float mini_right = dpad_panel.left + dpad_panel.width - menu_lane - lane_gap;
-    const float width_limit = mini_right - mini_left;
-    const float height_limit = dpad_panel.top - mini_top - 12.f * scale;
-    const float mini_size = std::min(width_limit, height_limit);
-    if(mini_size < 145.f * scale)
-        return false;
-
-    const float controls_top = mini_top + mini_size + 14.f * scale;
-    const float controls_bottom = dpad_panel.top - 12.f * scale;
-    if(controls_bottom - controls_top < 190.f * scale)
-        return false;
-
-    region = {dpad_panel.left, controls_top, dpad_panel.width,
-              controls_bottom - controls_top};
-    return true;
-}]=])
-string(FIND "${V25_WINUTIL}" "${V25_CONTROL_REGION_OLD}" V25_CONTROL_REGION_POS)
-if(V25_CONTROL_REGION_POS EQUAL -1)
-    message(FATAL_ERROR "v25 responsive: ACT/MENU region helper not found")
+    AndroidMobileLayout layout;]=])
+string(FIND "${V25_WINUTIL}" "${V25_REGION_HEAD_OLD}" V25_REGION_HEAD_POS)
+if(V25_REGION_HEAD_POS EQUAL -1)
+    message(FATAL_ERROR "v25 responsive: ACT region function not found")
 endif()
-string(REPLACE "${V25_CONTROL_REGION_OLD}" "${V25_CONTROL_REGION_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "${V25_REGION_HEAD_OLD}" "${V25_REGION_HEAD_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+set(V25_REGION_GEOM_OLD [=[    const float mini_top = 14.f;
+    const float info_gap = 10.f;
+    const float menu_lane = 60.f;
+    const float lane_gap = 8.f;]=])
+set(V25_REGION_GEOM_NEW [=[    const float mini_top = std::max(6.f, 14.f * scale);
+    const float info_gap = 10.f * scale;
+    const float menu_lane = 60.f * scale;
+    const float lane_gap = 8.f * scale;]=])
+string(FIND "${V25_WINUTIL}" "${V25_REGION_GEOM_OLD}" V25_REGION_GEOM_POS)
+if(V25_REGION_GEOM_POS EQUAL -1)
+    message(FATAL_ERROR "v25 responsive: final ACT region geometry not found")
+endif()
+string(REPLACE "${V25_REGION_GEOM_OLD}" "${V25_REGION_GEOM_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "const float height_limit = dpad_panel.top - mini_top - 12.f;"
+               "const float height_limit = dpad_panel.top - mini_top - 12.f * scale;"
+               V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "if(mini_size < 145.f)" "if(mini_size < 145.f * scale)" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "const float controls_top = mini_top + mini_size + 14.f;"
+               "const float controls_top = mini_top + mini_size + 14.f * scale;"
+               V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "const float controls_bottom = dpad_panel.top - 12.f;"
+               "const float controls_bottom = dpad_panel.top - 12.f * scale;"
+               V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "if(controls_bottom - controls_top < 108.f)"
+               "if(controls_bottom - controls_top < 108.f * scale)"
+               V25_WINUTIL "${V25_WINUTIL}")
 
+# MENU size follows the same scale.
 set(V25_MENU_HEIGHT_OLD [=[float android_action_menu_height() {
     const float h = static_cast<float>(mainPtr().getSize().y) * 0.07f;
     return std::min(82.f, std::max(68.f, h));
@@ -277,8 +212,8 @@ if(V25_MENU_HEIGHT_POS EQUAL -1)
 endif()
 string(REPLACE "${V25_MENU_HEIGHT_OLD}" "${V25_MENU_HEIGHT_NEW}" V25_WINUTIL "${V25_WINUTIL}")
 
-# Scale the final v20 ACT geometry's fixed dimensions. The phone still evaluates
-# to the existing numbers; narrower devices get proportionally smaller controls.
+# Final v20-v23 ACT grid: retain the tuned phone proportions but scale its
+# spacing, thresholds and row sizes on narrower displays.
 set(V25_QUICK_HEAD_OLD [=[    const sf::Vector2u window_size = mainPtr().getSize();
     const float col_gap = 6.f;
     const float row_gap = 5.f;]=])
@@ -288,35 +223,36 @@ set(V25_QUICK_HEAD_NEW [=[    const sf::Vector2u window_size = mainPtr().getSize
     const float row_gap = 5.f * scale;]=])
 string(FIND "${V25_WINUTIL}" "${V25_QUICK_HEAD_OLD}" V25_QUICK_HEAD_POS)
 if(V25_QUICK_HEAD_POS EQUAL -1)
-    message(FATAL_ERROR "v25 responsive: final v20 ACT geometry header not found")
+    message(FATAL_ERROR "v25 responsive: final ACT grid header not found")
 endif()
 string(REPLACE "${V25_QUICK_HEAD_OLD}" "${V25_QUICK_HEAD_NEW}" V25_WINUTIL "${V25_WINUTIL}")
-
-string(REPLACE "const float desired_left = info_right + 10.f;"
-               "const float desired_left = info_right + 10.f * scale;"
+set(V25_ACT_LEFT_OLD [=[        const float desired_left =
+            layout.stats.screen.left + layout.stats.screen.width + 6.f;]=])
+set(V25_ACT_LEFT_NEW [=[        const float desired_left =
+            layout.stats.screen.left + layout.stats.screen.width + 6.f * scale;]=])
+string(FIND "${V25_WINUTIL}" "${V25_ACT_LEFT_OLD}" V25_ACT_LEFT_POS)
+if(V25_ACT_LEFT_POS EQUAL -1)
+    message(FATAL_ERROR "v25 responsive: final ACT left divider not found")
+endif()
+string(REPLACE "${V25_ACT_LEFT_OLD}" "${V25_ACT_LEFT_NEW}" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "if(candidate_w >= 270.f && candidate_h >= 32.f)"
+               "if(candidate_w >= 270.f * scale && candidate_h >= 32.f * scale)"
                V25_WINUTIL "${V25_WINUTIL}")
-string(REPLACE "if(candidate_w >= 270.f && candidate_h >= 32.f) {"
-               "if(candidate_w >= 270.f * scale && candidate_h >= 32.f * scale) {"
-               V25_WINUTIL "${V25_WINUTIL}")
-string(REPLACE "action_h = std::min(60.f, candidate_h);"
-               "action_h = std::min(60.f * scale, candidate_h);"
+string(REPLACE "action_h = std::min(68.f, candidate_h + 7.f);"
+               "action_h = std::min(68.f * scale, candidate_h + 7.f * scale);"
                V25_WINUTIL "${V25_WINUTIL}")
 string(REPLACE "action_w = std::min(138.f, std::max(96.f, static_cast<float>(window_size.y) * 0.14f));"
                "action_w = std::min(138.f * scale, std::max(72.f, 96.f * scale));"
                V25_WINUTIL "${V25_WINUTIL}")
-string(REPLACE "action_h = std::min(58.f, std::max(42.f, static_cast<float>(window_size.y) * 0.068f));"
-               "action_h = std::min(58.f * scale, std::max(34.f, 42.f * scale));"
+string(REPLACE "action_h = std::min(66.f, std::max(48.f, static_cast<float>(window_size.y) * 0.076f));"
+               "action_h = std::min(66.f * scale, std::max(34.f, 48.f * scale));"
                V25_WINUTIL "${V25_WINUTIL}")
-string(REPLACE "top = fallback_region.top + 1.f;"
-               "top = fallback_region.top + 1.f * scale;"
-               V25_WINUTIL "${V25_WINUTIL}")
-string(REPLACE "dpad_panel.top - total_h - 10.f"
-               "dpad_panel.top - total_h - 10.f * scale"
-               V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "top = fallback_region.top + 1.f;" "top = fallback_region.top + 1.f * scale;" V25_WINUTIL "${V25_WINUTIL}")
+string(REPLACE "dpad_panel.top - total_h - 10.f" "dpad_panel.top - total_h - 10.f * scale" V25_WINUTIL "${V25_WINUTIL}")
 
-# The large MENU button's minimum width should follow the same scale.
 set(V25_MENU_WIDTH_OLD [=[        const float width = std::min(region.width, std::max(160.f, region.width * 0.62f));]=])
-set(V25_MENU_WIDTH_NEW [=[        const float width = std::min(region.width, std::max(120.f, 160.f * android_reference_scale()));]=])
+set(V25_MENU_WIDTH_NEW [=[        const float width = std::min(region.width,
+            std::max(120.f, 160.f * android_reference_scale()));]=])
 string(FIND "${V25_WINUTIL}" "${V25_MENU_WIDTH_OLD}" V25_MENU_WIDTH_POS)
 if(V25_MENU_WIDTH_POS EQUAL -1)
     message(FATAL_ERROR "v25 responsive: final MENU width expression not found")
@@ -325,12 +261,10 @@ string(REPLACE "${V25_MENU_WIDTH_OLD}" "${V25_MENU_WIDTH_NEW}" V25_WINUTIL "${V2
 
 file(WRITE "${V25_WINUTIL_CPP}" "${V25_WINUTIL}")
 
-# Dialog labels use scale-aware text, which deliberately draws in the window's
-# default physical-pixel view. The old code multiplied by get_ui_scale() only.
-# When a dialog had to be fit smaller on a shorter screen, its button artwork
-# respected the fitted View but text did not, causing shifted/missing labels.
-# Derive the actual pixels-per-logical-unit from the active View and apply the
-# additional fit factor to both text position and glyph scale.
+# Dialog text is drawn in the window's default physical-pixel view even though
+# the controls themselves are drawn through a fitted logical View. Use the
+# active View's actual pixels-per-logical-unit so text and button artwork shrink
+# together on shorter displays.
 file(READ "${V25_RENDER_TEXT_CPP}" V25_RENDER_TEXT)
 set(V25_TEXT_OLD [=[		sf::Vector2f text_position = str_to_draw.getPosition() * (float)get_ui_scale();
 		text_position += scaled_view_top_left(dest_window, scaled_view);
