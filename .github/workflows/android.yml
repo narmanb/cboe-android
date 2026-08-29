@@ -207,11 +207,14 @@ jobs:
             runtime-resume-pid.txt
             runtime-resume-logcat.txt
             runtime-after-tap-logcat.txt
+            runtime-dialog-logcat.txt
             runtime-before-resume.png
             runtime-after-resume.png
+            runtime-new-party-dialog.png
             runtime-before-resume.raw
             runtime-after-resume.raw
             runtime-launch.txt
             runtime-resume-launch.txt
+            runtime-dialog-launch.txt
             android-emulator-build.log
           if-no-files-found: warn
