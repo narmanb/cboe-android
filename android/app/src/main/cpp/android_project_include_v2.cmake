@@ -37,6 +37,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v28_dialog_touch_rele
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v31_dialog_close_restore.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v32_adaptive_layout.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v30_startup_centers.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/android_mobile_ui_fixes_v33_startup_and_safe_edges.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_codeberg_fixes_v25.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_codeberg_fixes_v26.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/android_codeberg_fixes_v27.cmake")
