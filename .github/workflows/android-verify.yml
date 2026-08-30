@@ -123,3 +123,4 @@ jobs:
             verify-ps.txt
             verify-failure.raw
           if-no-files-found: warn
+          retention-days: 7
