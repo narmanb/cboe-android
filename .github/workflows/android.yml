@@ -89,6 +89,7 @@ jobs:
           name: android-build-log
           path: android-build.log
           if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload debug APK
         if: success()
@@ -97,6 +98,7 @@ jobs:
           name: cboe-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 7
 
   # Build an x86_64 copy inside CI and launch it in an Android emulator.
   # This verifies process survival, the visible Home/resume result, and real
@@ -221,3 +223,4 @@ jobs:
             runtime-dialog-cancel-center.txt
             android-emulator-build.log
           if-no-files-found: warn
+          retention-days: 7
